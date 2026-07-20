@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Upload, Music, FileText, Sparkles, ArrowRight } from 'lucide-react';
+import { Upload, Music, FileText, Sparkles, ArrowRight, Loader2 } from 'lucide-react';
 
 interface Stage1Props {
-  onNext: (data: { audioName: string; lyricsText: string }) => void;
+  onNext: (data: { audioFile: File | null; lyricsText: string; title: string; artist: string }) => void;
+  isSyncing?: boolean;
 }
 
-export const AudioLyricsStage: React.FC<Stage1Props> = ({ onNext }) => {
+export const AudioLyricsStage: React.FC<Stage1Props> = ({ onNext, isSyncing = false }) => {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [lyricsText, setLyricsText] = useState<string>(
     '[Verse 1]\nI remember when we were young\nWalking under golden stars\n\n[Chorus]\nLet every word move with the music\nFeel the energy tonight'
@@ -41,7 +42,7 @@ export const AudioLyricsStage: React.FC<Stage1Props> = ({ onNext }) => {
     <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn">
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-extrabold text-white tracking-tight">Audio & Lyrics Input</h2>
-        <p className="text-gray-400 text-sm">Upload your audio or video file (MP3, WAV, FLAC, M4A, MP4, MKV, WebM) and paste lyrics.</p>
+        <p className="text-gray-400 text-sm">Upload your audio/video file and paste your song lyrics below.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -69,7 +70,7 @@ export const AudioLyricsStage: React.FC<Stage1Props> = ({ onNext }) => {
 
           <div className="space-y-3 pt-2">
             <div>
-              <label className="text-xs font-semibold text-gray-400">Title</label>
+              <label className="text-xs font-semibold text-gray-400">Song Title</label>
               <input
                 type="text"
                 value={title}
@@ -78,7 +79,7 @@ export const AudioLyricsStage: React.FC<Stage1Props> = ({ onNext }) => {
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-gray-400">Artist</label>
+              <label className="text-xs font-semibold text-gray-400">Artist Name</label>
               <input
                 type="text"
                 value={artist}
@@ -95,10 +96,10 @@ export const AudioLyricsStage: React.FC<Stage1Props> = ({ onNext }) => {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-violet-400" />
-                <h3 className="font-semibold text-white">2. Song Lyrics</h3>
+                <h3 className="font-semibold text-white">2. Paste Song Lyrics</h3>
               </div>
               <label className="text-xs text-indigo-400 hover:underline cursor-pointer">
-                Import TXT/LRC
+                Import File
                 <input type="file" accept=".txt,.lrc" onChange={handleLyricsFileUpload} className="hidden" />
               </label>
             </div>
@@ -106,7 +107,7 @@ export const AudioLyricsStage: React.FC<Stage1Props> = ({ onNext }) => {
               rows={10}
               value={lyricsText}
               onChange={(e) => setLyricsText(e.target.value)}
-              placeholder="Paste lyrics here..."
+              placeholder="Paste matching lyrics here..."
               className="w-full bg-surface border border-surfaceBorder rounded-xl p-3 text-sm text-gray-200 focus:outline-none focus:border-violet-500 font-mono resize-none"
             />
           </div>
@@ -116,12 +117,22 @@ export const AudioLyricsStage: React.FC<Stage1Props> = ({ onNext }) => {
       {/* Action CTA */}
       <div className="flex justify-end pt-4">
         <button
-          onClick={() => onNext({ audioName: audioFile?.name || 'sample.mp3', lyricsText })}
-          className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold px-8 py-3.5 rounded-xl shadow-lg shadow-indigo-500/25 transition-all text-sm"
+          disabled={isSyncing}
+          onClick={() => onNext({ audioFile, lyricsText, title, artist })}
+          className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold px-8 py-3.5 rounded-xl shadow-lg shadow-indigo-500/25 transition-all text-sm disabled:opacity-50 cursor-pointer"
         >
-          <Sparkles className="w-4 h-4" />
-          <span>Synchronize & Continue</span>
-          <ArrowRight className="w-4 h-4" />
+          {isSyncing ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Synchronizing Audio & Lyrics...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-4 h-4" />
+              <span>Synchronize & Continue</span>
+              <ArrowRight className="w-4 h-4" />
+            </>
+          )}
         </button>
       </div>
     </div>

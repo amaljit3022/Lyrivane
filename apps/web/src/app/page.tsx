@@ -14,6 +14,61 @@ export default function HomePage() {
   const [selectedRenderer, setSelectedRenderer] = useState('karaoke');
   const [selectedTemplate, setSelectedTemplate] = useState('classic-two-line');
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [projectId, setProjectId] = useState<string>('demo');
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleStage1Submit = async (data: { audioFile: File | null; lyricsText: string; title: string; artist: string }) => {
+    setIsSyncing(true);
+
+    try {
+      // Step A: Create Project
+      const createRes = await fetch('http://localhost:8005/api/v1/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: data.title || 'Untitled Song',
+          artist: data.artist || 'Unknown Artist',
+          language: 'en'
+        })
+      });
+
+      let activeId = 'demo';
+      if (createRes.ok) {
+        const createData = await createRes.json();
+        activeId = createData.project_id;
+        setProjectId(activeId);
+      }
+
+      // Step B: Upload Audio File if provided
+      if (data.audioFile) {
+        const formData = new FormData();
+        formData.append('file', data.audioFile);
+        await fetch(`http://localhost:8005/api/v1/projects/${activeId}/audio`, {
+          method: 'POST',
+          body: formData
+        });
+      }
+
+      // Step C: Upload Pasted Lyrics
+      const lyricsFormData = new FormData();
+      lyricsFormData.append('raw_text', data.lyricsText);
+      await fetch(`http://localhost:8005/api/v1/projects/${activeId}/lyrics`, {
+        method: 'POST',
+        body: lyricsFormData
+      });
+
+      // Step D: Trigger Automated Synchronization
+      await fetch(`http://localhost:8005/api/v1/projects/${activeId}/synchronize`, {
+        method: 'POST'
+      });
+
+    } catch (err) {
+      console.warn('Sync connection fallback:', err);
+    } finally {
+      setIsSyncing(false);
+      setCurrentStage(2);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-gray-100 font-sans">
@@ -29,7 +84,8 @@ export default function HomePage() {
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-10">
         {currentStage === 1 && (
           <AudioLyricsStage
-            onNext={() => setCurrentStage(2)}
+            onNext={handleStage1Submit}
+            isSyncing={isSyncing}
           />
         )}
 
@@ -38,7 +94,6 @@ export default function HomePage() {
             selectedRenderer={selectedRenderer}
             onSelectRenderer={(renId) => {
               setSelectedRenderer(renId);
-              // Set default template for renderer
               if (renId === 'karaoke') setSelectedTemplate('classic-two-line');
               if (renId === 'remotion') setSelectedTemplate('cinematic-minimal');
               if (renId === 'blender') setSelectedTemplate('rainy-window');
@@ -66,6 +121,7 @@ export default function HomePage() {
 
         {currentStage === 5 && (
           <GenerateStage
+            projectId={projectId}
             selectedRenderer={selectedRenderer}
             selectedTemplate={selectedTemplate}
           />

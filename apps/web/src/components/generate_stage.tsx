@@ -4,11 +4,13 @@ import React, { useState } from 'react';
 import { Film, Download, CheckCircle2, FolderOpen, AlertCircle } from 'lucide-react';
 
 interface GenerateStageProps {
+  projectId: string;
   selectedRenderer: string;
   selectedTemplate: string;
 }
 
 export const GenerateStage: React.FC<GenerateStageProps> = ({
+  projectId,
   selectedRenderer,
   selectedTemplate,
 }) => {
@@ -18,7 +20,9 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
   const [isRendering, setIsRendering] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
-  const [downloadUrl, setDownloadUrl] = useState<string>('http://localhost:8005/api/v1/projects/demo/renders/download');
+  const [downloadUrl, setDownloadUrl] = useState<string>(
+    `http://localhost:8005/api/v1/projects/${projectId || 'demo'}/renders/download`
+  );
   const [outputFolderMsg, setOutputFolderMsg] = useState<string | null>(null);
 
   const startRender = async () => {
@@ -27,8 +31,10 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
     setIsComplete(false);
     setOutputFolderMsg(null);
 
+    const targetProjectId = projectId || 'demo';
+
     try {
-      const response = await fetch('http://localhost:8005/api/v1/projects/demo/render', {
+      const response = await fetch(`http://localhost:8005/api/v1/projects/${targetProjectId}/render`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -43,9 +49,12 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
       if (response.ok) {
         const data = await response.json();
         setDownloadUrl(`http://localhost:8005${data.download_url}`);
+      } else {
+        setDownloadUrl(`http://localhost:8005/api/v1/projects/${targetProjectId}/renders/download`);
       }
     } catch (err) {
-      console.warn('API render connection fallback:', err);
+      console.warn('Render API call fallback:', err);
+      setDownloadUrl(`http://localhost:8005/api/v1/projects/${targetProjectId}/renders/download`);
     }
 
     const interval = setInterval(() => {
@@ -56,7 +65,7 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
           setIsComplete(true);
           return 100;
         }
-        return prev + 30;
+        return prev + 25;
       });
     }, 600);
   };
@@ -64,14 +73,15 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
   const handleDownload = () => {
     const link = document.createElement('a');
     link.href = downloadUrl;
-    link.download = 'lyricflow_video.mp4';
+    link.download = `${projectId || 'lyricflow'}_video.mp4`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   const handleOpenFolder = () => {
-    setOutputFolderMsg('Projects output directory: C:\\Worklab\\amaljit\\Lyrivane\\projects\\demo\\renders\\');
+    const targetProjectId = projectId || 'demo';
+    setOutputFolderMsg(`Projects output directory: C:\\Worklab\\amaljit\\Lyrivane\\projects\\${targetProjectId}\\renders\\`);
   };
 
   return (
@@ -152,7 +162,7 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
             </p>
             <button
               onClick={startRender}
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-10 py-4 rounded-xl shadow-xl shadow-emerald-600/20 transition-all text-base"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-10 py-4 rounded-xl shadow-xl shadow-emerald-600/20 transition-all text-base cursor-pointer"
             >
               <Film className="w-5 h-5" />
               <span>Start Video Generation</span>
