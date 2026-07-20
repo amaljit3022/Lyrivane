@@ -1,0 +1,167 @@
+'use client';
+
+import React, { useState } from 'react';
+import { Film, Download, CheckCircle2, RefreshCw, FolderOpen, Play } from 'lucide-react';
+
+interface GenerateStageProps {
+  selectedRenderer: string;
+  selectedTemplate: string;
+}
+
+export const GenerateStage: React.FC<GenerateStageProps> = ({
+  selectedRenderer,
+  selectedTemplate,
+}) => {
+  const [resolution, setResolution] = useState('1080p');
+  const [fps, setFps] = useState('30');
+  const [codec, setCodec] = useState('h264');
+  const [isRendering, setIsRendering] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
+
+  const startRender = () => {
+    setIsRendering(true);
+    setProgress(15);
+    setIsComplete(false);
+
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setIsRendering(false);
+          setIsComplete(true);
+          return 100;
+        }
+        return prev + 25;
+      });
+    }, 800);
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn">
+      <div className="text-center space-y-2">
+        <h2 className="text-3xl font-extrabold text-white tracking-tight">Generate Final Lyrical Video</h2>
+        <p className="text-gray-400 text-sm">Configure output encoding settings and launch high-resolution video rendering.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Quality Config */}
+        <div className="glass-card p-6 rounded-2xl space-y-4">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Resolution</label>
+          <div className="grid grid-cols-3 gap-2">
+            {['1080p', '1440p', '4K'].map((res) => (
+              <button
+                key={res}
+                onClick={() => setResolution(res)}
+                className={`py-2 rounded-xl text-xs font-semibold border transition-all ${
+                  resolution === res
+                    ? 'bg-indigo-600 border-indigo-500 text-white'
+                    : 'bg-surface border-surfaceBorder text-gray-400 hover:text-white'
+                }`}
+              >
+                {res}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Frame Rate */}
+        <div className="glass-card p-6 rounded-2xl space-y-4">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Frame Rate</label>
+          <div className="grid grid-cols-2 gap-2">
+            {['30', '60'].map((f) => (
+              <button
+                key={f}
+                onClick={() => setFps(f)}
+                className={`py-2 rounded-xl text-xs font-semibold border transition-all ${
+                  fps === f
+                    ? 'bg-indigo-600 border-indigo-500 text-white'
+                    : 'bg-surface border-surfaceBorder text-gray-400 hover:text-white'
+                }`}
+              >
+                {f} FPS
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Codec */}
+        <div className="glass-card p-6 rounded-2xl space-y-4">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Video Codec</label>
+          <div className="grid grid-cols-2 gap-2">
+            {['h264', 'h265'].map((c) => (
+              <button
+                key={c}
+                onClick={() => setCodec(c)}
+                className={`py-2 rounded-xl text-xs font-semibold border transition-all uppercase ${
+                  codec === c
+                    ? 'bg-indigo-600 border-indigo-500 text-white'
+                    : 'bg-surface border-surfaceBorder text-gray-400 hover:text-white'
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Render Action Box */}
+      <div className="glass-card p-8 rounded-2xl text-center space-y-6">
+        {!isRendering && !isComplete && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-300">
+              Ready to encode video using <span className="text-indigo-400 font-semibold uppercase">{selectedRenderer}</span> with template <span className="text-violet-400 font-semibold">{selectedTemplate}</span>.
+            </p>
+            <button
+              onClick={startRender}
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-10 py-4 rounded-xl shadow-xl shadow-emerald-600/20 transition-all text-base"
+            >
+              <Film className="w-5 h-5" />
+              <span>Start Video Generation</span>
+            </button>
+          </div>
+        )}
+
+        {isRendering && (
+          <div className="space-y-4 max-w-md mx-auto">
+            <div className="flex justify-between text-xs font-semibold text-gray-300">
+              <span>Rendering Video ({selectedRenderer})...</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="w-full h-3 bg-surfaceBorder rounded-full overflow-hidden p-0.5">
+              <div
+                className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 rounded-full transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-400 animate-pulse">Encoding frames and multiplexing original master audio...</p>
+          </div>
+        )}
+
+        {isComplete && (
+          <div className="space-y-6">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <CheckCircle2 className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold text-white">Video Render Complete!</h3>
+              <p className="text-xs text-gray-400">Output saved to project storage in original master audio fidelity.</p>
+            </div>
+
+            <div className="flex justify-center gap-4">
+              <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-xl shadow-lg transition-all text-sm">
+                <Download className="w-4 h-4" />
+                <span>Download Video</span>
+              </button>
+              <button className="flex items-center gap-2 bg-surface hover:bg-surfaceBorder border border-surfaceBorder text-gray-200 font-semibold px-6 py-3 rounded-xl transition-all text-sm">
+                <FolderOpen className="w-4 h-4" />
+                <span>Open Output Folder</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
