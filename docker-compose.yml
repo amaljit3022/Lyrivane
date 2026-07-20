@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lyrivane_postgres
+    environment:
+      POSTGRES_DB: lyricflow
+      POSTGRES_USER: lyricflow
+      POSTGRES_PASSWORD: lyricflow_secret
+    ports:
+      - "5435:5432"  # Unique host port 5435
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lyricflow -d lyricflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: lyrivane_redis
+    ports:
+      - "6382:6379"  # Unique host port 6382
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: lyrivane_api
+    ports:
+      - "8005:8000"  # Unique host port 8005
+    environment:
+      DATABASE_URL: postgresql://lyricflow:lyricflow_secret@postgres:5432/lyricflow
+      REDIS_URL: redis://redis:6379/0
+      PROJECTS_DIR: /app/projects
+    volumes:
+      - ./projects:/app/projects
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: lyrivane_frontend
+    ports:
+      - "3005:3000"  # Unique host port 3005
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8005
+    depends_on:
+      - api
+
+  audio-worker:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: lyrivane_audio_worker
+    command: python -m celery -A worker.celery_app worker -Q audio --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://lyricflow:lyricflow_secret@postgres:5432/lyricflow
+      REDIS_URL: redis://redis:6379/0
+      PROJECTS_DIR: /app/projects
+    volumes:
+      - ./projects:/app/projects
+    depends_on:
+      - redis
+
+  alignment-worker:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: lyrivane_alignment_worker
+    command: python -m celery -A worker.celery_app worker -Q alignment --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://lyricflow:lyricflow_secret@postgres:5432/lyricflow
+      REDIS_URL: redis://redis:6379/0
+      PROJECTS_DIR: /app/projects
+    volumes:
+      - ./projects:/app/projects
+    depends_on:
+      - redis
+
+volumes:
+  postgres_data:
