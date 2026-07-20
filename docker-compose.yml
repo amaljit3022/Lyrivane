@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -9,7 +7,7 @@ services:
       POSTGRES_USER: lyricflow
       POSTGRES_PASSWORD: lyricflow_secret
     ports:
-      - "5435:5432"  # Unique host port 5435
+      - "5435:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +20,7 @@ services:
     image: redis:7-alpine
     container_name: lyrivane_redis
     ports:
-      - "6382:6379"  # Unique host port 6382
+      - "6382:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -35,7 +33,7 @@ services:
       dockerfile: Dockerfile
     container_name: lyrivane_api
     ports:
-      - "8005:8000"  # Unique host port 8005
+      - "8005:8000"
     environment:
       DATABASE_URL: postgresql://lyricflow:lyricflow_secret@postgres:5432/lyricflow
       REDIS_URL: redis://redis:6379/0
@@ -54,7 +52,7 @@ services:
       dockerfile: Dockerfile
     container_name: lyrivane_frontend
     ports:
-      - "3005:3000"  # Unique host port 3005
+      - "3005:3000"
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8005
     depends_on:
