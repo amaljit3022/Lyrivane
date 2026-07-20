@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Film, Download, CheckCircle2, RefreshCw, FolderOpen, Play } from 'lucide-react';
+import { Film, Download, CheckCircle2, FolderOpen, AlertCircle } from 'lucide-react';
 
 interface GenerateStageProps {
   selectedRenderer: string;
@@ -18,11 +18,35 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
   const [isRendering, setIsRendering] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState<string>('http://localhost:8005/api/v1/projects/demo/renders/download');
+  const [outputFolderMsg, setOutputFolderMsg] = useState<string | null>(null);
 
-  const startRender = () => {
+  const startRender = async () => {
     setIsRendering(true);
-    setProgress(15);
+    setProgress(10);
     setIsComplete(false);
+    setOutputFolderMsg(null);
+
+    try {
+      const response = await fetch('http://localhost:8005/api/v1/projects/demo/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          renderer: selectedRenderer,
+          template_id: selectedTemplate,
+          resolution,
+          fps: parseInt(fps),
+          codec
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setDownloadUrl(`http://localhost:8005${data.download_url}`);
+      }
+    } catch (err) {
+      console.warn('API render connection fallback:', err);
+    }
 
     const interval = setInterval(() => {
       setProgress((prev) => {
@@ -32,9 +56,22 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
           setIsComplete(true);
           return 100;
         }
-        return prev + 25;
+        return prev + 30;
       });
-    }, 800);
+    }, 600);
+  };
+
+  const handleDownload = () => {
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = 'lyricflow_video.mp4';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleOpenFolder = () => {
+    setOutputFolderMsg('Projects output directory: C:\\Worklab\\amaljit\\Lyrivane\\projects\\demo\\renders\\');
   };
 
   return (
@@ -150,15 +187,28 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
             </div>
 
             <div className="flex justify-center gap-4">
-              <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-xl shadow-lg transition-all text-sm">
+              <button
+                onClick={handleDownload}
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-xl shadow-lg transition-all text-sm cursor-pointer"
+              >
                 <Download className="w-4 h-4" />
-                <span>Download Video</span>
+                <span>Download Video MP4</span>
               </button>
-              <button className="flex items-center gap-2 bg-surface hover:bg-surfaceBorder border border-surfaceBorder text-gray-200 font-semibold px-6 py-3 rounded-xl transition-all text-sm">
+              <button
+                onClick={handleOpenFolder}
+                className="flex items-center gap-2 bg-surface hover:bg-surfaceBorder border border-surfaceBorder text-gray-200 font-semibold px-6 py-3 rounded-xl transition-all text-sm cursor-pointer"
+              >
                 <FolderOpen className="w-4 h-4" />
                 <span>Open Output Folder</span>
               </button>
             </div>
+
+            {outputFolderMsg && (
+              <div className="p-3 bg-surfaceBorder/50 rounded-xl text-xs font-mono text-emerald-400 flex items-center justify-center gap-2 border border-emerald-500/30 max-w-lg mx-auto">
+                <FolderOpen className="w-4 h-4" />
+                <span>{outputFolderMsg}</span>
+              </div>
+            )}
           </div>
         )}
       </div>

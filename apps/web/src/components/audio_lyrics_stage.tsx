@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Upload, Music, FileText, CheckCircle2, Sparkles, ArrowRight } from 'lucide-react';
+import { Upload, Music, FileText, Sparkles, ArrowRight } from 'lucide-react';
 
 interface Stage1Props {
   onNext: (data: { audioName: string; lyricsText: string }) => void;
@@ -41,24 +41,29 @@ export const AudioLyricsStage: React.FC<Stage1Props> = ({ onNext }) => {
     <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn">
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-extrabold text-white tracking-tight">Audio & Lyrics Input</h2>
-        <p className="text-gray-400 text-sm">Upload your song track and paste the matching lyrics. Automatic synchronization handles the rest.</p>
+        <p className="text-gray-400 text-sm">Upload your audio or video file (MP3, WAV, FLAC, M4A, MP4, MKV, WebM) and paste lyrics.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Audio Upload Box */}
+        {/* Audio / Video Upload Box */}
         <div className="glass-card p-6 rounded-2xl flex flex-col justify-between space-y-4">
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Music className="w-5 h-5 text-indigo-400" />
-              <h3 className="font-semibold text-white">1. Audio Track</h3>
+              <h3 className="font-semibold text-white">1. Audio / Video Track</h3>
             </div>
             <label className="border-2 border-dashed border-surfaceBorder hover:border-indigo-500/50 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all bg-surface/40 hover:bg-surface/80 group">
               <Upload className="w-8 h-8 text-gray-400 group-hover:text-indigo-400 mb-2 transition-colors" />
               <span className="text-sm font-medium text-gray-200">
-                {audioFile ? audioFile.name : 'Upload MP3, WAV, FLAC, M4A'}
+                {audioFile ? audioFile.name : 'Upload MP3, WAV, FLAC, M4A, MP4, MKV'}
               </span>
               <span className="text-xs text-gray-500 mt-1">Drag & drop or click to browse</span>
-              <input type="file" accept="audio/*" onChange={handleAudioUpload} className="hidden" />
+              <input
+                type="file"
+                accept="audio/*,video/mp4,video/mkv,video/webm,.mp3,.wav,.flac,.m4a,.aac,.ogg,.opus,.mp4,.mkv,.webm"
+                onChange={handleAudioUpload}
+                className="hidden"
+              />
             </label>
           </div>
 
