@@ -25,6 +25,7 @@ from services.template_service import TemplateService
 from services.visual_intelligence import VisualIntelligenceService
 from renderers.karaoke_renderer import KaraokeRendererAdapter
 from renderers.remotion_renderer import RemotionRendererAdapter
+from worker.celery_app import celery_app
 
 app = FastAPI(
     title="LyricFlow Studio API",
