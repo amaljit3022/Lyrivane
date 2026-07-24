@@ -11,11 +11,13 @@ import { AdvancedEditorDrawer } from '@/components/advanced_editor_drawer';
 
 export default function HomePage() {
   const [currentStage, setCurrentStage] = useState(1);
-  const [selectedRenderer, setSelectedRenderer] = useState('karaoke');
-  const [selectedTemplate, setSelectedTemplate] = useState('classic-two-line');
+  const [selectedRenderer, setSelectedRenderer] = useState('remotion');
+  const [selectedTemplate, setSelectedTemplate] = useState('editorial-motion');
+  const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [projectId, setProjectId] = useState<string>('demo');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('');
 
   const handleStage1Submit = async (data: { audioFile: File | null; lyricsText: string; title: string; artist: string }) => {
     setIsSyncing(true);
@@ -62,6 +64,22 @@ export default function HomePage() {
         method: 'POST'
       });
 
+      // Step E: Poll for synchronization completion
+      let isDone = false;
+      while (!isDone) {
+        await new Promise(r => setTimeout(r, 2000));
+        const statusRes = await fetch(`http://localhost:8005/api/v1/projects/${activeId}`);
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          if (statusData.sync_progress?.message) {
+            setSyncMessage(`${statusData.sync_progress.message} (${statusData.sync_progress.percent}%)`);
+          }
+          if (statusData.status === 'synchronized' || statusData.status === 'error') {
+            isDone = true;
+          }
+        }
+      }
+
     } catch (err) {
       console.warn('Sync connection fallback:', err);
     } finally {
@@ -86,6 +104,7 @@ export default function HomePage() {
           <AudioLyricsStage
             onNext={handleStage1Submit}
             isSyncing={isSyncing}
+            syncMessage={syncMessage}
           />
         )}
 
@@ -95,7 +114,7 @@ export default function HomePage() {
             onSelectRenderer={(renId) => {
               setSelectedRenderer(renId);
               if (renId === 'karaoke') setSelectedTemplate('classic-two-line');
-              if (renId === 'remotion') setSelectedTemplate('cinematic-minimal');
+              if (renId === 'remotion') setSelectedTemplate('editorial-motion');
               if (renId === 'blender') setSelectedTemplate('rainy-window');
             }}
             onNext={() => setCurrentStage(3)}
@@ -106,15 +125,19 @@ export default function HomePage() {
           <TemplateStage
             selectedRenderer={selectedRenderer}
             selectedTemplate={selectedTemplate}
+            aspectRatio={aspectRatio}
             onSelectTemplate={(tplId) => setSelectedTemplate(tplId)}
+            onSelectAspectRatio={(ratio) => setAspectRatio(ratio)}
             onNext={() => setCurrentStage(4)}
           />
         )}
 
         {currentStage === 4 && (
           <PreviewStage
+            projectId={projectId}
             selectedRenderer={selectedRenderer}
             selectedTemplate={selectedTemplate}
+            aspectRatio={aspectRatio}
             onNext={() => setCurrentStage(5)}
           />
         )}
@@ -124,6 +147,7 @@ export default function HomePage() {
             projectId={projectId}
             selectedRenderer={selectedRenderer}
             selectedTemplate={selectedTemplate}
+            aspectRatio={aspectRatio}
           />
         )}
       </main>

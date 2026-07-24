@@ -7,12 +7,14 @@ interface GenerateStageProps {
   projectId: string;
   selectedRenderer: string;
   selectedTemplate: string;
+  aspectRatio?: '16:9' | '9:16' | '1:1';
 }
 
 export const GenerateStage: React.FC<GenerateStageProps> = ({
   projectId,
   selectedRenderer,
   selectedTemplate,
+  aspectRatio = '16:9',
 }) => {
   const [resolution, setResolution] = useState('1080p');
   const [fps, setFps] = useState('30');
@@ -42,7 +44,9 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
           template_id: selectedTemplate,
           resolution,
           fps: parseInt(fps),
-          codec
+          codec,
+          aspect_ratio: aspectRatio,
+          motion_intensity: 0.6
         })
       });
 

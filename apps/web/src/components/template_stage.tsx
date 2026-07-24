@@ -1,49 +1,64 @@
 'use client';
 
-import React, { useState } from 'react';
-import { LayoutTemplate, Check, ArrowRight, Smartphone, Monitor, Square } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Check, ArrowRight, Smartphone, Monitor, Square, Sparkles } from 'lucide-react';
 
 interface TemplateItem {
   id: string;
   name: string;
   renderer: string;
   description: string;
-  gradient: string;
+  gradient?: string;
+  supported_aspect_ratios?: string[];
 }
 
-const TEMPLATES_BY_RENDERER: Record<string, TemplateItem[]> = {
-  karaoke: [
-    { id: 'classic-two-line', name: 'Classic Two-Line', renderer: 'karaoke', description: 'Traditional karaoke text layout with bottom line highlighting.', gradient: 'from-blue-900 to-indigo-900' },
-    { id: 'minimal-dark', name: 'Minimal Dark', renderer: 'karaoke', description: 'Sleek dark background with vibrant active word glows.', gradient: 'from-gray-900 to-black' },
-    { id: 'album-art-bg', name: 'Album Art Focus', renderer: 'karaoke', description: 'Blurred album cover background with subtle lyric overlays.', gradient: 'from-purple-900 to-slate-900' },
-  ],
-  remotion: [
-    { id: 'cinematic-minimal', name: 'Cinematic Minimal', renderer: 'remotion', description: 'Fluid typography transitions with smooth camera pans.', gradient: 'from-violet-900 to-slate-950' },
-    { id: 'neon-pulse', name: 'Neon Pulse', renderer: 'remotion', description: 'Glow typography synced to peak audio energy frequencies.', gradient: 'from-fuchsia-900 to-cyan-950' },
-    { id: 'typewriter', name: 'Floating Typewriter', renderer: 'remotion', description: 'Tactile word-by-word reveal with vintage grain.', gradient: 'from-amber-950 to-neutral-900' },
-  ],
-  blender: [
-    { id: 'rainy-window', name: 'Rainy Window 3D', renderer: 'blender', description: 'Glass refraction with glowing neon lyrics behind rainfall.', gradient: 'from-cyan-950 to-slate-950' },
-    { id: 'misty-forest', name: 'Misty Forest 3D', renderer: 'blender', description: 'Volumetric atmosphere with floating metallic text.', gradient: 'from-emerald-950 to-stone-950' },
-    { id: 'galaxy-space', name: 'Galaxy Cosmic 3D', renderer: 'blender', description: 'Deep space particle fields with glowing celestial titles.', gradient: 'from-indigo-950 to-purple-950' },
-  ],
-};
+const DEFAULT_TEMPLATES: TemplateItem[] = [
+  { id: 'editorial-motion', name: 'Editorial Motion', renderer: 'remotion', description: 'Magazine kinetic typography with spring physics, uppercase emphasis, and dark editorial backgrounds.', gradient: 'from-amber-900 to-stone-950' },
+  { id: 'cinematic-fade', name: 'Cinematic Fade', renderer: 'remotion', description: 'Emotional serif typography with radial dark ambient gradients, camera zoom, and blur transitions.', gradient: 'from-violet-950 to-slate-950' },
+  { id: 'whispering-wind', name: 'Whispering Wind', renderer: 'remotion', description: 'Floating wave motion, horizontal drift, particle dispersion, and serene visual cyan tones.', gradient: 'from-cyan-950 to-blue-950' },
+];
 
 interface TemplateStageProps {
   selectedRenderer: string;
   selectedTemplate: string;
+  aspectRatio: '16:9' | '9:16' | '1:1';
   onSelectTemplate: (templateId: string) => void;
+  onSelectAspectRatio: (ratio: '16:9' | '9:16' | '1:1') => void;
   onNext: () => void;
 }
 
 export const TemplateStage: React.FC<TemplateStageProps> = ({
   selectedRenderer,
   selectedTemplate,
+  aspectRatio,
   onSelectTemplate,
+  onSelectAspectRatio,
   onNext,
 }) => {
-  const templates = TEMPLATES_BY_RENDERER[selectedRenderer] || TEMPLATES_BY_RENDERER['karaoke'];
-  const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
+  const [templates, setTemplates] = useState<TemplateItem[]>(DEFAULT_TEMPLATES);
+
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        const res = await fetch(`http://localhost:8005/api/v1/templates?renderer=${selectedRenderer}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setTemplates(data.map((t: any, i: number) => ({
+              id: t.id,
+              name: t.name,
+              renderer: t.renderer || selectedRenderer,
+              description: t.description || 'Custom kinetic typography template.',
+              gradient: DEFAULT_TEMPLATES[i % DEFAULT_TEMPLATES.length].gradient
+            })));
+          }
+        }
+      } catch (err) {
+        console.warn('API templates fallback:', err);
+      }
+    };
+    fetchTemplates();
+  }, [selectedRenderer]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn">
@@ -56,18 +71,18 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
       <div className="flex justify-center gap-3">
         {[
           { id: '16:9', label: '16:9 Landscape', icon: Monitor },
-          { id: '9:16', label: '9:16 Vertical', icon: Smartphone },
-          { id: '1:1', label: '1:1 Square', icon: Square },
+          { id: '9:16', label: '9:16 Vertical (Shorts/TikTok)', icon: Smartphone },
+          { id: '1:1', label: '1:1 Square (Instagram)', icon: Square },
         ].map((ar) => {
           const Icon = ar.icon;
           const isSelected = aspectRatio === ar.id;
           return (
             <button
               key={ar.id}
-              onClick={() => setAspectRatio(ar.id as any)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold border transition-all ${
+              onClick={() => onSelectAspectRatio(ar.id as any)}
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-semibold border transition-all ${
                 isSelected
-                  ? 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20'
+                  ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/25 scale-105'
                   : 'glass-card border-surfaceBorder text-gray-400 hover:text-white'
               }`}
             >
@@ -93,10 +108,11 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
               }`}
             >
               <div>
-                <div className={`w-full h-32 rounded-xl bg-gradient-to-tr ${tpl.gradient} flex items-center justify-center p-4 mb-4 relative overflow-hidden shadow-inner`}>
-                  <span className="text-xs font-bold font-mono tracking-widest text-white/90 uppercase drop-shadow-md">
-                    LYRICS PREVIEW
-                  </span>
+                <div className={`w-full h-32 rounded-xl bg-gradient-to-tr ${tpl.gradient || 'from-indigo-950 to-slate-900'} flex items-center justify-center p-4 mb-4 relative overflow-hidden shadow-inner`}>
+                  <div className="flex items-center gap-1.5 text-xs font-bold font-mono tracking-widest text-white/90 uppercase drop-shadow-md">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{tpl.name}</span>
+                  </div>
                   {isSelected && (
                     <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-violet-500 flex items-center justify-center text-white">
                       <Check className="w-4 h-4" />
@@ -116,7 +132,7 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
           onClick={onNext}
           className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold px-8 py-3.5 rounded-xl shadow-lg shadow-indigo-500/25 transition-all text-sm"
         >
-          <span>Continue to Preview</span>
+          <span>Continue to Live Preview</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

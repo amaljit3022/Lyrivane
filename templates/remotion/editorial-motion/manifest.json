@@ -1,0 +1,22 @@
+{
+  "id": "editorial-motion",
+  "name": "Editorial Motion",
+  "renderer": "remotion",
+  "version": "1.0.0",
+  "description": "Magazine-inspired kinetic typography",
+  "supported_aspect_ratios": ["16:9", "9:16", "1:1"],
+  "timing_support": ["line", "word"],
+  "preview_asset": "preview.mp4",
+  "config_schema": {
+    "font_family": {
+      "type": "font",
+      "default": "Inter"
+    },
+    "motion_intensity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.5
+    }
+  }
+}

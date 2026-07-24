@@ -40,6 +40,20 @@ yarn-error.log*
 projects/*
 !projects/.gitkeep
 
+# Temp Scratch & Test Media Files
+*.json
+*.mp4
+*.mp3
+*.wav
+!apps/**/package.json
+!apps/**/tsconfig.json
+!apps/**/manifest.json
+!templates/**/manifest.json
+timeline_dump.txt
+dump.py
+test_matcher.py
+test_sync.py
+
 # Environment & IDE
 .env
 .env.local

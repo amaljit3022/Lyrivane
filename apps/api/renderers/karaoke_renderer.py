@@ -145,6 +145,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             "-f", "lavfi", "-i", f"color=c=0x090d16:s=1920x1080:d={duration_sec}",
             *audio_args,
             "-vf", f"subtitles={output_ass.name}",
+            "-map", "0:v:0", "-map", "1:a:0",
             "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k",
             "-shortest",
@@ -153,7 +154,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
         try:
             res = subprocess.run(cmd, cwd=output_dir, capture_output=True, text=True, check=True)
-        except Exception as e:
+        except subprocess.CalledProcessError as e:
+            print(f"FFmpeg render failed with code {e.returncode}")
+            print(f"STDOUT: {e.stdout}")
+            print(f"STDERR: {e.stderr}")
             # Fallback FFmpeg render without subtitles filter to ensure a valid playable MP4 is ALWAYS created
             fallback_cmd = [
                 "ffmpeg", "-y",
@@ -164,6 +168,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 output_path.name
             ]
             subprocess.run(fallback_cmd, cwd=output_dir, capture_output=True, text=True)
+        except Exception as e:
+            print(f"Unexpected error during render: {e}")
 
         return output_path
 

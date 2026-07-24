@@ -1,0 +1,28 @@
+{
+  "id": "whispering-wind",
+  "name": "Whispering Wind",
+  "renderer": "remotion",
+  "version": "1.0.0",
+  "description": "Soft drifting typography with delicate wave motions, particle dispersion, and serene visual tones",
+  "supported_aspect_ratios": ["16:9", "9:16", "1:1"],
+  "timing_support": ["line", "word"],
+  "preview_asset": "preview.mp4",
+  "config_schema": {
+    "font_family": {
+      "type": "font",
+      "default": "Quicksand"
+    },
+    "motion_intensity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.35
+    },
+    "particle_density": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 30
+    }
+  }
+}

@@ -87,6 +87,7 @@ class CanonicalTimeline(BaseModel):
     lines: List[LineTiming] = Field(default_factory=list)
     diagnostics: List[ValidationDiagnostic] = Field(default_factory=list)
     overall_confidence: float = 1.0
+    audio_analysis: Optional[Dict[str, Any]] = None
 
 
 class ProjectCreateRequest(BaseModel):
@@ -104,4 +105,5 @@ class ProjectResponse(BaseModel):
     created_at: str
     has_audio: bool = False
     has_lyrics: bool = False
+    sync_progress: Optional[Dict[str, Any]] = None
     canonical_timeline: Optional[CanonicalTimeline] = None

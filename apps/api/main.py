@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTa
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+import json
 
 from schemas.project import (
     ProjectCreateRequest,
@@ -19,6 +20,9 @@ from schemas.project import (
 )
 from services.audio_service import AudioService
 from services.lyrics_service import LyricsService
+from services.alignment_service import AlignmentService
+from services.template_service import TemplateService
+from services.visual_intelligence import VisualIntelligenceService
 from renderers.karaoke_renderer import KaraokeRendererAdapter
 from renderers.remotion_renderer import RemotionRendererAdapter
 
@@ -48,6 +52,8 @@ class RenderRequest(BaseModel):
     resolution: str = "1080p"
     fps: int = 30
     codec: str = "h264"
+    aspect_ratio: str = "16:9"
+    motion_intensity: float = 0.5
 
 
 @app.get("/health")
@@ -55,9 +61,67 @@ def health_check():
     return {"status": "ok", "app": "LyricFlow Studio API", "version": "1.0.0"}
 
 
+@app.get("/api/v1/templates")
+def list_templates(renderer: Optional[str] = None):
+    return TemplateService.list_templates(renderer=renderer)
+
+
+@app.get("/api/v1/projects/{project_id}/visual-plan")
+def get_visual_plan(
+    project_id: str, 
+    style: str = "editorial-motion", 
+    palette: str = "default", 
+    aspect_ratio: str = "16:9",
+    motion_intensity: float = 0.5
+):
+    project = projects_db.get(project_id, {})
+    project_dir = PROJECTS_DIR / project_id
+    audio_meta = project.get("audio_meta") or AudioMetadata(
+        original_file=str(project_dir / "audio" / "original" / "song.mp3"),
+        duration_ms=180000,
+        sample_rate=44100,
+        channels=2,
+        title=project.get("title", "Untitled"),
+        artist=project.get("artist", "Unknown")
+    )
+
+    if project.get("canonical_timeline"):
+        timeline_dict = project["canonical_timeline"]
+        if "audio" not in timeline_dict or timeline_dict["audio"] is None:
+            timeline_dict["audio"] = audio_meta.model_dump()
+        timeline = CanonicalTimeline(**timeline_dict)
+    else:
+        lines_raw = project.get("lines") or []
+        timeline = CanonicalTimeline(
+            project_id=project_id,
+            title=project.get("title", "Untitled"),
+            artist=project.get("artist", "Unknown"),
+            audio=audio_meta,
+            lines=[LineTiming(**l) for l in lines_raw]
+        )
+
+    plan = VisualIntelligenceService.generate_visual_plan(
+        timeline=timeline,
+        style=style,
+        palette=palette,
+        aspect_ratio=aspect_ratio,
+        motion_intensity=motion_intensity
+    )
+
+    return plan.model_dump()
+
+
+
 @app.post("/api/v1/projects", response_model=ProjectResponse)
 def create_project(req: ProjectCreateRequest):
-    project_id = str(uuid.uuid4())
+    import random
+    import string
+    import re
+    
+    title_slug = "".join(c if c.isalnum() else "-" for c in (req.title or "project").lower())
+    title_slug = re.sub(r'-+', '-', title_slug).strip('-')[:20]
+    suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=4))
+    project_id = f"{title_slug}-{suffix}" if title_slug else f"proj-{suffix}"
     project_dir = PROJECTS_DIR / project_id
     (project_dir / "audio" / "original").mkdir(parents=True, exist_ok=True)
     (project_dir / "audio" / "working").mkdir(parents=True, exist_ok=True)
@@ -99,10 +163,56 @@ def get_project(project_id: str):
             "audio_meta": None,
             "sections": [],
             "lines": [],
+            "sync_progress": None,
             "canonical_timeline": None
         }
         return ProjectResponse(**dummy_project)
-    return ProjectResponse(**projects_db[project_id])
+        
+    project = projects_db[project_id]
+    
+    # Check for progress if we are synchronizing
+    if project.get("status") == "synchronizing":
+        project_dir = PROJECTS_DIR / project_id
+        timeline_file = project_dir / "timeline.json"
+        progress_file = project_dir / "progress.json"
+        
+        if timeline_file.exists():
+            with open(timeline_file, "r", encoding="utf-8") as f:
+                timeline_data = json.load(f)
+                
+            audio_meta = project.get("audio_meta")
+            # Apply AlignmentService to align Whisper's hallucinated timings back to user's precise lyrics
+            aligned_lines = AlignmentService.align_user_lyrics_to_whisper(
+                project.get("lines", []),
+                timeline_data.get("lines", [])
+            )
+            
+            timeline = CanonicalTimeline(
+                project_id=project_id,
+                title=project.get("title", "Untitled"),
+                artist=project.get("artist", "Unknown"),
+                audio=audio_meta,
+                sections=[SectionTiming(**s) for s in project.get("sections", [])],
+                lines=[LineTiming(**l) for l in aligned_lines],
+                overall_confidence=0.95
+            )
+            project["canonical_timeline"] = timeline.model_dump()
+            project["lines"] = [l.model_dump() for l in timeline.lines]
+            project["status"] = "synchronized"
+            project["sync_progress"] = {"message": "Synchronization complete!", "percent": 100}
+            
+        elif progress_file.exists():
+            try:
+                with open(progress_file, "r", encoding="utf-8") as f:
+                    project["sync_progress"] = json.load(f)
+                    
+                # If the worker encountered a fatal error
+                if project["sync_progress"].get("percent") == -1:
+                    project["status"] = "error"
+            except json.JSONDecodeError:
+                pass
+                
+    return ProjectResponse(**project)
 
 
 @app.post("/api/v1/projects/{project_id}/audio", response_model=ProjectResponse)
@@ -152,6 +262,25 @@ async def upload_audio(project_id: str, file: UploadFile = File(...)):
         project["status"] = "audio_uploaded"
 
     return ProjectResponse(**projects_db[project_id])
+
+
+@app.get("/api/v1/projects/{project_id}/audio")
+def get_audio(project_id: str):
+    if project_id not in projects_db:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = projects_db[project_id]
+    if not project.get("audio_meta") or not project["audio_meta"].working_file:
+        raise HTTPException(status_code=404, detail="Audio not found")
+    
+    audio_path = Path(project["audio_meta"].working_file)
+    if not audio_path.exists():
+        raise HTTPException(status_code=404, detail="Audio file missing on disk")
+        
+    return FileResponse(
+        path=audio_path,
+        media_type="audio/wav"
+    )
+
 
 
 @app.post("/api/v1/projects/{project_id}/lyrics", response_model=ProjectResponse)
@@ -209,68 +338,12 @@ def trigger_synchronization(project_id: str):
         raise HTTPException(status_code=404, detail="Project not found")
 
     project = projects_db[project_id]
-    audio_meta = project.get("audio_meta") or AudioMetadata(
-        original_file="",
-        duration_ms=180000,
-        sample_rate=44100,
-        channels=2,
-        title=project.get("title", "Golden Stars"),
-        artist=project.get("artist", "Krittika")
-    )
-    duration = audio_meta.duration_ms
-    lines_raw = project.get("lines", [])
-
-    num_lines = len(lines_raw)
-    line_timings = []
-
-    if num_lines > 0:
-        start_offset = 2000
-        usable_duration = duration - 4000
-        slot_duration = usable_duration // num_lines if num_lines > 0 else 3000
-
-        for idx, line_dict in enumerate(lines_raw):
-            line_start = start_offset + (idx * slot_duration)
-            line_end = line_start + min(slot_duration - 400, 4500)
-
-            words = line_dict.get("words", [])
-            num_words = len(words)
-            word_timings = []
-
-            if num_words > 0:
-                word_slot = max((line_end - line_start) // num_words, 100)
-                for w_idx, w_dict in enumerate(words):
-                    w_start = line_start + (w_idx * word_slot)
-                    w_end = w_start + word_slot - 30
-                    word_timings.append({
-                        **w_dict,
-                        "start_ms": w_start,
-                        "end_ms": w_end,
-                        "confidence": 0.96,
-                        "source": "automatic"
-                    })
-
-            line_timings.append({
-                **line_dict,
-                "start_ms": line_start,
-                "end_ms": line_end,
-                "confidence": 0.95,
-                "source": "automatic",
-                "words": word_timings
-            })
-
-    timeline = CanonicalTimeline(
-        project_id=project_id,
-        title=project.get("title", "Golden Stars"),
-        artist=project.get("artist", "Krittika"),
-        audio=audio_meta,
-        sections=[SectionTiming(**s) for s in project.get("sections", [])],
-        lines=[LineTiming(**l) for l in line_timings],
-        overall_confidence=0.95
-    )
-
-    project["canonical_timeline"] = timeline.model_dump()
-    project["lines"] = [l.model_dump() for l in timeline.lines]
-    project["status"] = "synchronized"
+    
+    project["status"] = "synchronizing"
+    project["sync_progress"] = {"message": "Queued for alignment...", "percent": 0}
+    
+    # Dispatch to Celery worker on the alignment queue
+    celery_app.send_task("worker.align_lyrics", args=[project_id], queue="alignment")
 
     return ProjectResponse(**project)
 
@@ -289,45 +362,39 @@ def render_video(project_id: str, req: RenderRequest):
         duration_ms=180000,
         sample_rate=44100,
         channels=2,
-        title=project.get("title", "Golden Stars"),
-        artist=project.get("artist", "Krittika")
+        title=project.get("title", "Untitled"),
+        artist=project.get("artist", "Unknown")
     )
 
-    lines_raw = project.get("lines") or [
-        {
-            "id": "l-1",
-            "display_text": "I remember when we were young",
-            "alignment_text": "i remember when we were young",
-            "start_ms": 1000,
-            "end_ms": 5000,
-            "words": [
-                {"id": "w-1", "display_text": "I", "alignment_text": "i", "start_ms": 1000, "end_ms": 1500},
-                {"id": "w-2", "display_text": "remember", "alignment_text": "remember", "start_ms": 1510, "end_ms": 2500},
-                {"id": "w-3", "display_text": "when", "alignment_text": "when", "start_ms": 2510, "end_ms": 3000},
-                {"id": "w-4", "display_text": "we", "alignment_text": "we", "start_ms": 3010, "end_ms": 3500},
-                {"id": "w-5", "display_text": "were", "alignment_text": "were", "start_ms": 3510, "end_ms": 4000},
-                {"id": "w-6", "display_text": "young", "alignment_text": "young", "start_ms": 4010, "end_ms": 5000}
-            ]
-        }
-    ]
-
-    timeline = CanonicalTimeline(
-        project_id=project_id,
-        title=project.get("title", "Golden Stars"),
-        artist=project.get("artist", "Krittika"),
-        audio=audio_meta,
-        lines=[LineTiming(**l) for l in lines_raw]
-    )
+    if project.get("canonical_timeline"):
+        timeline_dict = project["canonical_timeline"]
+        if "audio" not in timeline_dict or timeline_dict["audio"] is None:
+            timeline_dict["audio"] = audio_meta.model_dump()
+        timeline = CanonicalTimeline(**timeline_dict)
+    else:
+        lines_raw = project.get("lines") or []
+        timeline = CanonicalTimeline(
+            project_id=project_id,
+            title=project.get("title", "Untitled"),
+            artist=project.get("artist", "Unknown"),
+            audio=audio_meta,
+            lines=[LineTiming(**l) for l in lines_raw]
+        )
 
     if req.renderer == "remotion":
         renderer = RemotionRendererAdapter()
     else:
         renderer = KaraokeRendererAdapter()
-
     rendered_path = renderer.render(
         timeline=timeline,
         template_id=req.template_id,
-        settings={"resolution": req.resolution, "fps": req.fps, "codec": req.codec},
+        settings={
+            "resolution": req.resolution, 
+            "fps": req.fps, 
+            "codec": req.codec, 
+            "aspect_ratio": req.aspect_ratio,
+            "motion_intensity": req.motion_intensity
+        },
         output_path=output_video_path
     )
 
@@ -377,7 +444,10 @@ def download_rendered_video(project_id: str):
         )
         renderer.render(timeline, "classic-two-line", {}, output_video)
 
-    filename = f"{project_id}_lyricflow.mp4"
+    project = projects_db.get(project_id, {})
+    title = project.get("title", "Untitled").replace(" ", "_")
+    filename = f"{title}_lyricflow.mp4"
+    
     return FileResponse(
         path=output_video,
         filename=filename,

@@ -6,9 +6,10 @@ import { Upload, Music, FileText, Sparkles, ArrowRight, Loader2 } from 'lucide-r
 interface Stage1Props {
   onNext: (data: { audioFile: File | null; lyricsText: string; title: string; artist: string }) => void;
   isSyncing?: boolean;
+  syncMessage?: string;
 }
 
-export const AudioLyricsStage: React.FC<Stage1Props> = ({ onNext, isSyncing = false }) => {
+export const AudioLyricsStage: React.FC<Stage1Props> = ({ onNext, isSyncing = false, syncMessage = '' }) => {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [lyricsText, setLyricsText] = useState<string>(
     '[Verse 1]\nI remember when we were young\nWalking under golden stars\n\n[Chorus]\nLet every word move with the music\nFeel the energy tonight'
@@ -124,7 +125,7 @@ export const AudioLyricsStage: React.FC<Stage1Props> = ({ onNext, isSyncing = fa
           {isSyncing ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Synchronizing Audio & Lyrics...</span>
+              <span>{syncMessage || 'Synchronizing Audio & Lyrics...'}</span>
             </>
           ) : (
             <>

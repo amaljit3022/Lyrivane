@@ -40,6 +40,9 @@ services:
       PROJECTS_DIR: /app/projects
     volumes:
       - ./projects:/app/projects
+      - ./apps/api:/app
+      - ./apps/remotion:/app/remotion
+      - ./templates:/app/templates
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,6 +73,7 @@ services:
       PROJECTS_DIR: /app/projects
     volumes:
       - ./projects:/app/projects
+      - ./apps/api:/app
     depends_on:
       - redis
 
@@ -85,6 +89,7 @@ services:
       PROJECTS_DIR: /app/projects
     volumes:
       - ./projects:/app/projects
+      - ./apps/api:/app
     depends_on:
       - redis
 

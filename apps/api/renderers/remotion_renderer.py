@@ -13,32 +13,9 @@ class RemotionRendererAdapter(RendererAdapter):
     for fluid kinetic typography and animated video generation.
     """
 
-    TEMPLATES = [
-        {
-            "id": "cinematic-minimal",
-            "name": "Cinematic Minimal",
-            "description": "Minimal cinematic typography with smooth camera pans and subtle blurs.",
-            "aspect_ratios": ["16:9", "9:16", "1:1"],
-            "supports_word_timing": True
-        },
-        {
-            "id": "neon-pulse",
-            "name": "Neon Pulse",
-            "description": "High-contrast glowing typography synced to audio peak energy.",
-            "aspect_ratios": ["16:9", "9:16", "1:1"],
-            "supports_word_timing": True
-        },
-        {
-            "id": "typewriter",
-            "name": "Floating Typewriter",
-            "description": "Vintage typewriter reveal with tactile word animation.",
-            "aspect_ratios": ["16:9", "9:16"],
-            "supports_word_timing": True
-        }
-    ]
-
     def list_templates(self) -> List[Dict[str, Any]]:
-        return self.TEMPLATES
+        from services.template_service import TemplateService
+        return TemplateService.list_templates(renderer="remotion")
 
     def validate_project(
         self,
@@ -46,14 +23,63 @@ class RemotionRendererAdapter(RendererAdapter):
         template_id: str,
         settings: Dict[str, Any]
     ) -> Dict[str, Any]:
-        valid_ids = [t["id"] for t in self.TEMPLATES]
+        templates = self.list_templates()
+        valid_ids = [t.get("id") for t in templates]
         if template_id not in valid_ids:
-            template_id = "cinematic-minimal"
+            template_id = "editorial-motion"
         return {"status": "valid", "template_id": template_id}
 
     @staticmethod
     def prepare_remotion_props(timeline: CanonicalTimeline, template_id: str, settings: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert canonical timeline to Remotion composition JSON props."""
+        """Convert canonical timeline to Remotion composition JSON props with Visual Intelligence."""
+        from services.visual_intelligence import VisualIntelligenceService
+        from services.audio_analysis_service import AudioAnalysisService
+
+        audio_path = Path(timeline.audio.working_file or timeline.audio.original_file or "")
+        audio_analysis = AudioAnalysisService.analyze_audio(audio_path, duration_ms=timeline.audio.duration_ms)
+
+        aspect_ratio = settings.get("aspect_ratio", "16:9")
+        visual_plan = VisualIntelligenceService.generate_visual_plan(
+            timeline=timeline,
+            style=template_id,
+            aspect_ratio=aspect_ratio,
+            motion_intensity=settings.get("motion_intensity", 0.5)
+        )
+
+        formatted_lines = []
+        for line in timeline.lines:
+            plan = visual_plan.line_plans.get(line.id)
+            word_list = []
+            
+            for idx, w in enumerate(line.words):
+                w_comp = plan.words[idx] if (plan and idx < len(plan.words)) else None
+                
+                word_data = {
+                    "text": w.display_text,
+                    "start_ms": w.start_ms,
+                    "end_ms": w.end_ms,
+                    "start_frame": int((w.start_ms / 1000.0) * settings.get("fps", 30)),
+                    "end_frame": int((w.end_ms / 1000.0) * settings.get("fps", 30)),
+                    "importance": w_comp.importance if w_comp else 0.5,
+                    "enter_preset": w_comp.enter_preset if w_comp else "fade-up",
+                    "active_preset": w_comp.active_preset if w_comp else None,
+                    "exit_preset": w_comp.exit_preset if w_comp else "fade",
+                    "style": w_comp.style.model_dump() if w_comp else {}
+                }
+                word_list.append(word_data)
+
+            line_data = {
+                "id": line.id,
+                "display_text": line.display_text,
+                "start_ms": line.start_ms,
+                "end_ms": line.end_ms,
+                "start_frame": int((line.start_ms / 1000.0) * settings.get("fps", 30)),
+                "end_frame": int((line.end_ms / 1000.0) * settings.get("fps", 30)),
+                "layout_type": plan.layout.type if plan else "center",
+                "words": word_list
+            }
+            formatted_lines.append(line_data)
+
         return {
             "title": timeline.title,
             "artist": timeline.artist,
@@ -61,24 +87,10 @@ class RemotionRendererAdapter(RendererAdapter):
             "duration_in_frames": int((timeline.audio.duration_ms / 1000.0) * settings.get("fps", 30)),
             "fps": settings.get("fps", 30),
             "template_id": template_id,
-            "aspect_ratio": settings.get("aspect_ratio", "16:9"),
-            "lines": [
-                {
-                    "id": line.id,
-                    "display_text": line.display_text,
-                    "start_frame": int((line.start_ms / 1000.0) * settings.get("fps", 30)),
-                    "end_frame": int((line.end_ms / 1000.0) * settings.get("fps", 30)),
-                    "words": [
-                        {
-                            "text": w.display_text,
-                            "start_frame": int((w.start_ms / 1000.0) * settings.get("fps", 30)),
-                            "end_frame": int((w.end_ms / 1000.0) * settings.get("fps", 30))
-                        }
-                        for w in line.words
-                    ]
-                }
-                for line in timeline.lines
-            ]
+            "aspect_ratio": aspect_ratio,
+            "lines": formatted_lines,
+            "visual_plan": visual_plan.model_dump(),
+            "audio_analysis": audio_analysis.model_dump()
         }
 
     def create_preview(
@@ -109,15 +121,17 @@ class RemotionRendererAdapter(RendererAdapter):
             json.dump(props, f, indent=2)
 
         cmd = [
-            "npx", "remotion", "render",
+            "npx", "--yes", "remotion", "render",
             "src/index.ts",
-            template_id,
-            str(output_path),
-            "--props", str(props_path)
+            "LyrivaneComposition",
+            str(output_path.resolve()),
+            "--props", str(props_path.resolve())
         ]
 
+        remotion_cwd = Path("/app/remotion")
+        
         try:
-            subprocess.run(cmd, capture_output=True, text=True, check=True)
+            subprocess.run(cmd, cwd=remotion_cwd, capture_output=True, text=True, check=True)
         except Exception:
             # Fallback FFmpeg render to ensure a valid playable MP4 video file is ALWAYS produced
             duration_sec = max(timeline.audio.duration_ms / 1000.0, 5.0)
