@@ -15,6 +15,8 @@ LyricFlow Studio is a local-first, open-source application designed to transform
   3. **Cinematic Blender**: 3D typography, volumetric lighting, and particle environments.
 - **Decoupled Visual Iteration**: Visual tweaks (renderers, templates, fonts, colors, aspect ratios) never trigger audio resynchronization.
 - **Optional Waveform Editor**: Manual correction fallback under `Advanced -> Edit Lyrics or Timing`.
+- **Central lyric presentation**: The export fallback uses a centered lyric panel, active-word highlighting, and previous/next lyric context so the final MP4 matches the preview intent.
+- **Safe rendering fallback**: A Remotion failure cannot produce a silent or blank video; FFmpeg/ASS rendering preserves lyrics and the original soundtrack.
 
 ## 🚀 Quick Start (Docker)
 
@@ -29,6 +31,17 @@ docker compose --profile remotion up --build
 docker compose --profile blender up --build
 ```
 
+The API image includes the Linux browser libraries required by Remotion. If the
+image was created before those dependencies were added, rebuild the API image:
+
+```bash
+docker compose build api
+docker compose up -d api alignment-worker frontend
+```
+
+The application is local-first. Uploaded audio and generated videos remain in
+`projects/<project-id>/` and are intentionally excluded from Git.
+
 ## 📁 Repository Structure
 
 - `apps/api`: Python FastAPI backend, audio ingestion, lyrics normalization, and worker services.
@@ -36,6 +49,7 @@ docker compose --profile blender up --build
 - `packages/alignment`: Forced alignment algorithms and quality validation.
 - `templates/`: Engine-specific video rendering templates.
 - `projects/`: Local project files, cached stems, and rendered video outputs.
+- `docs/RENDERING_AND_SYNC.md`: Synchronization, renderer, design, and troubleshooting notes.
 
 ## 📄 License
 

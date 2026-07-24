@@ -394,6 +394,8 @@ def render_video(project_id: str, req: RenderRequest):
         },
         output_path=output_video_path
     )
+    if not rendered_path.exists() or rendered_path.stat().st_size < 1000:
+        raise HTTPException(status_code=500, detail="Renderer completed without producing a usable MP4 file")
 
     return {
         "status": "success",

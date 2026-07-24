@@ -6,6 +6,9 @@ import { WhisperingWind } from "./templates/WhisperingWind";
 import { WordCompositionProps } from "./typography/WordRenderer";
 import { AudioAnalysisProps } from "./audio/useAudioReactive";
 import { TitleCard } from "./typography/TitleCard";
+import { AuroraPulse } from "./templates/AuroraPulse";
+import { GlassHalo } from "./templates/GlassHalo";
+import { SolarFlare } from "./templates/SolarFlare";
 
 export type LineTiming = {
   id: string;
@@ -26,11 +29,17 @@ export type LyrivaneProps = {
 };
 
 export const LyrivaneComposition: React.FC<LyrivaneProps> = (props) => {
-  const templateId = props.template_id || "editorial-motion";
+  const templateId = props.template_id || "aurora-pulse";
   const aspectRatio = props.aspect_ratio || "16:9";
 
   const renderTemplate = () => {
     switch (templateId) {
+      case "aurora-pulse":
+        return <AuroraPulse audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
+      case "glass-halo":
+        return <GlassHalo audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
+      case "solar-flare":
+        return <SolarFlare audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
       case "cinematic-fade":
       case "cinematic-minimal":
         return (
@@ -68,7 +77,7 @@ export const LyrivaneComposition: React.FC<LyrivaneProps> = (props) => {
   return (
     <>
       {showTitleCard && (
-        <Sequence from={0} durationInFrames={120}>
+        <Sequence durationInFrames={120}>
           <TitleCard title={props.title || "Untitled"} artist={props.artist || "Unknown Artist"} />
         </Sequence>
       )}

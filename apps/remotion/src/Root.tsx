@@ -15,6 +15,7 @@ const defaultProps: LyrivaneProps = {
       ],
     },
   ],
+  template_id: "aurora-pulse",
   aspect_ratio: "16:9",
 };
 

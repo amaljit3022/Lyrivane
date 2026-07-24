@@ -1,9 +1,14 @@
 import json
+import logging
+import os
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 from renderers.base_renderer import RendererAdapter
 from schemas.project import CanonicalTimeline
+
+
+logger = logging.getLogger(__name__)
 
 
 class RemotionRendererAdapter(RendererAdapter):
@@ -26,7 +31,7 @@ class RemotionRendererAdapter(RendererAdapter):
         templates = self.list_templates()
         valid_ids = [t.get("id") for t in templates]
         if template_id not in valid_ids:
-            template_id = "editorial-motion"
+            template_id = "aurora-pulse"
         return {"status": "valid", "template_id": template_id}
 
     @staticmethod
@@ -80,10 +85,14 @@ class RemotionRendererAdapter(RendererAdapter):
             }
             formatted_lines.append(line_data)
 
+        audio_file = timeline.audio.original_file or timeline.audio.working_file
         return {
             "title": timeline.title,
             "artist": timeline.artist,
-            "audio_url": timeline.audio.original_file,
+            # Remotion components use camelCase props. Keep the snake_case key as
+            # well for older preview consumers, but always provide the render key.
+            "audioUrl": audio_file,
+            "audio_url": audio_file,
             "duration_in_frames": int((timeline.audio.duration_ms / 1000.0) * settings.get("fps", 30)),
             "fps": settings.get("fps", 30),
             "template_id": template_id,
@@ -121,29 +130,34 @@ class RemotionRendererAdapter(RendererAdapter):
             json.dump(props, f, indent=2)
 
         cmd = [
-            "npx", "--yes", "remotion", "render",
+            "npx", "--no-install", "remotion", "render",
             "src/index.ts",
             "LyrivaneComposition",
             str(output_path.resolve()),
-            "--props", str(props_path.resolve())
+            "--props", str(props_path.resolve()),
+            "--concurrency=1",
         ]
 
-        remotion_cwd = Path("/app/remotion")
-        
+        remotion_cwd = Path(os.getenv("REMOTION_DIR", "/app/remotion"))
+        if not remotion_cwd.exists():
+            remotion_cwd = Path(__file__).resolve().parents[2] / "remotion"
+
         try:
-            subprocess.run(cmd, cwd=remotion_cwd, capture_output=True, text=True, check=True)
-        except Exception:
-            # Fallback FFmpeg render to ensure a valid playable MP4 video file is ALWAYS produced
-            duration_sec = max(timeline.audio.duration_ms / 1000.0, 5.0)
-            fallback_cmd = [
-                "ffmpeg", "-y",
-                "-f", "lavfi", "-i", f"color=c=0x1e1b4b:s=1920x1080:d={duration_sec}",
-                "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
-                "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
-                "-c:a", "aac", "-shortest",
-                output_path.name
-            ]
-            subprocess.run(fallback_cmd, cwd=output_dir, capture_output=True, text=True)
+            result = subprocess.run(cmd, cwd=remotion_cwd, capture_output=True, text=True, check=False)
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr[-4000:] or result.stdout[-4000:])
+            if not output_path.exists() or output_path.stat().st_size < 1000:
+                raise RuntimeError("Remotion completed without creating a usable MP4")
+        except Exception as exc:
+            logger.exception("Remotion render failed; using FFmpeg fallback: %s", exc)
+            # Keep lyrics and the original soundtrack in the fallback. A blank
+            # color card is not a valid export for this application.
+            from renderers.karaoke_renderer import KaraokeRendererAdapter
+            fallback_path = KaraokeRendererAdapter().render(
+                timeline, "classic-two-line", {}, output_path
+            )
+            if not fallback_path.exists() or fallback_path.stat().st_size < 1000:
+                raise RuntimeError("Lyric-capable fallback failed to produce an MP4")
 
         return output_path
 

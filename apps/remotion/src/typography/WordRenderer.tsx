@@ -57,7 +57,7 @@ export const WordRenderer: React.FC<{
   const sizeMult = wStyle.font_size_mult || 1.0;
   const computedFontSize = Math.round(baseSize * sizeMult);
 
-  const textTransform = (wStyle.text_transform as any) || (word.importance && word.importance >= 0.8 ? "uppercase" : "none");
+  const textTransform = wStyle.text_transform || (word.importance && word.importance >= 0.8 ? "uppercase" : "none");
 
   // Audio-reactive beat pulse on high importance words
   let transformStr = anim.transform;

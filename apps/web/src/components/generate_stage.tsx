@@ -26,12 +26,14 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
     `http://localhost:8005/api/v1/projects/${projectId || 'demo'}/renders/download`
   );
   const [outputFolderMsg, setOutputFolderMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const startRender = async () => {
     setIsRendering(true);
     setProgress(10);
     setIsComplete(false);
     setOutputFolderMsg(null);
+    setErrorMsg(null);
 
     const targetProjectId = projectId || 'demo';
 
@@ -54,11 +56,14 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
         const data = await response.json();
         setDownloadUrl(`http://localhost:8005${data.download_url}`);
       } else {
-        setDownloadUrl(`http://localhost:8005/api/v1/projects/${targetProjectId}/renders/download`);
+        const message = await response.text();
+        throw new Error(message || `Render failed (${response.status})`);
       }
     } catch (err) {
-      console.warn('Render API call fallback:', err);
-      setDownloadUrl(`http://localhost:8005/api/v1/projects/${targetProjectId}/renders/download`);
+      console.error('Render API call failed:', err);
+      setIsRendering(false);
+      setErrorMsg(err instanceof Error ? err.message : 'Video generation failed');
+      return;
     }
 
     const interval = setInterval(() => {
@@ -159,6 +164,11 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
 
       {/* Render Action Box */}
       <div className="glass-card p-8 rounded-2xl text-center space-y-6">
+        {errorMsg && (
+          <div className="p-4 rounded-xl border border-red-500/40 bg-red-500/10 text-sm text-red-300">
+            {errorMsg}
+          </div>
+        )}
         {!isRendering && !isComplete && (
           <div className="space-y-4">
             <p className="text-sm text-gray-300">
