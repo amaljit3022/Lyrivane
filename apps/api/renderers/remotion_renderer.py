@@ -32,6 +32,10 @@ class RemotionRendererAdapter(RendererAdapter):
         valid_ids = [t.get("id") for t in templates]
         if template_id not in valid_ids:
             template_id = "aurora-pulse"
+        template = next(t for t in templates if t.get("id") == template_id)
+        aspect_ratio = settings.get("aspect_ratio", "16:9")
+        if aspect_ratio not in template.get("supported_aspect_ratios", ["16:9", "9:16", "1:1"]):
+            return {"status": "invalid", "message": f"Template {template_id} does not support {aspect_ratio}"}
         return {"status": "valid", "template_id": template_id}
 
     @staticmethod

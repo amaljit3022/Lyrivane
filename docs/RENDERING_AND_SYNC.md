@@ -47,7 +47,9 @@ The central export presentation is intentionally restrained and readable:
 - dark central panel for contrast;
 - no full-width vector drawing layer, because that layer caused visible background banding/flicker in FFmpeg/libass output.
 
-Remotion templates live in `apps/remotion/src/templates/` and their metadata lives in `templates/remotion/`. The FFmpeg fallback is implemented in `apps/api/renderers/karaoke_renderer.py` so a failed Remotion environment still produces a useful lyric video.
+Remotion templates live in `apps/remotion/src/templates/` and their metadata lives in `templates/remotion/`. The current catalog includes Aurora Pulse, Glass Halo, Solar Flare, Editorial Motion, Cinematic Fade, Whispering Wind, plus the future-ready Neon Orbit, Paper Bloom, and Signal Noir designs. The FFmpeg fallback is implemented in `apps/api/renderers/karaoke_renderer.py` so a failed Remotion environment still produces a useful lyric video.
+
+Template manifests are the discovery contract for both engines. They declare supported aspect ratios and timing support; the API rejects unsupported renderer, codec, FPS, resolution, or aspect-ratio combinations before a render starts. Karaoke keeps only renderer-specific ASS style defaults in Python while its names, descriptions, and supported formats come from the manifest.
 
 ## Renderer runtime requirements
 

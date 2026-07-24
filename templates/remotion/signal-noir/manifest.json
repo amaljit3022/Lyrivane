@@ -1,0 +1,11 @@
+{
+  "id": "signal-noir",
+  "name": "Signal Noir",
+  "renderer": "remotion",
+  "version": "1.0.0",
+  "description": "Monochrome broadcast-inspired lyrics with scan lines, restrained distortion, and sharp active words.",
+  "preview_gradient": "from-slate-950 via-zinc-900 to-black",
+  "supported_aspect_ratios": ["16:9", "9:16", "1:1"],
+  "timing_support": ["line", "word"],
+  "config_schema": {"motion_intensity": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.5}}
+}

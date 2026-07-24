@@ -9,6 +9,9 @@ import { TitleCard } from "./typography/TitleCard";
 import { AuroraPulse } from "./templates/AuroraPulse";
 import { GlassHalo } from "./templates/GlassHalo";
 import { SolarFlare } from "./templates/SolarFlare";
+import { NeonOrbit } from "./templates/NeonOrbit";
+import { PaperBloom } from "./templates/PaperBloom";
+import { SignalNoir } from "./templates/SignalNoir";
 
 export type LineTiming = {
   id: string;
@@ -42,6 +45,12 @@ export const LyrivaneComposition: React.FC<LyrivaneProps> = (props) => {
         return <GlassHalo audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
       case "solar-flare":
         return <SolarFlare audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
+      case "neon-orbit":
+        return <NeonOrbit audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
+      case "paper-bloom":
+        return <PaperBloom audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
+      case "signal-noir":
+        return <SignalNoir audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
       case "cinematic-fade":
       case "cinematic-minimal":
         return (

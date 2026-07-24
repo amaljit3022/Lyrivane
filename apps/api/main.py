@@ -67,6 +67,8 @@ def health_check():
 
 @app.get("/api/v1/templates")
 def list_templates(renderer: Optional[str] = None):
+    if renderer and renderer not in SUPPORTED_RENDERERS:
+        raise HTTPException(status_code=422, detail=f"Unsupported renderer: {renderer}")
     return TemplateService.list_templates(renderer=renderer)
 
 
@@ -350,6 +352,14 @@ def trigger_synchronization(project_id: str):
 
 @app.post("/api/v1/projects/{project_id}/render")
 def render_video(project_id: str, req: RenderRequest):
+    if req.resolution not in {"1080p", "1440p", "4K"}:
+        raise HTTPException(status_code=422, detail="resolution must be 1080p, 1440p, or 4K")
+    if req.aspect_ratio not in {"16:9", "9:16", "1:1"}:
+        raise HTTPException(status_code=422, detail="aspect_ratio must be 16:9, 9:16, or 1:1")
+    if not 1 <= req.fps <= 120:
+        raise HTTPException(status_code=422, detail="fps must be between 1 and 120")
+    if req.codec.lower() not in {"h264", "h265", "hevc"}:
+        raise HTTPException(status_code=422, detail="codec must be h264 or h265")
     project_dir = PROJECTS_DIR / project_id
     renders_dir = project_dir / "renders"
     renders_dir.mkdir(parents=True, exist_ok=True)
@@ -390,6 +400,8 @@ def render_video(project_id: str, req: RenderRequest):
         req.template_id,
         {"aspect_ratio": req.aspect_ratio, "fps": req.fps, "resolution": req.resolution, "codec": req.codec},
     )
+    if validation.get("status") != "valid":
+        raise HTTPException(status_code=422, detail=validation.get("message", "Template settings are invalid"))
     resolved_template_id = validation["template_id"]
     rendered_path = renderer.render(
         timeline=timeline,

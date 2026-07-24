@@ -36,6 +36,20 @@ class KaraokeRendererAdapter(RendererAdapter):
     ]
 
     def list_templates(self) -> List[Dict[str, Any]]:
+        # Keep the renderer defaults as a safe fallback, but let the manifest
+        # catalog control names, descriptions, supported ratios, and presets.
+        try:
+            from services.template_service import TemplateService
+            manifests = TemplateService.list_templates(renderer="karaoke")
+            if manifests:
+                defaults = {template["id"]: template for template in self.TEMPLATES}
+                return [
+                    {**defaults.get(manifest["id"], {}), **manifest,
+                     **manifest.get("render_config", {})}
+                    for manifest in manifests
+                ]
+        except Exception:
+            pass
         return self.TEMPLATES
 
     def validate_project(
@@ -44,9 +58,13 @@ class KaraokeRendererAdapter(RendererAdapter):
         template_id: str,
         settings: Dict[str, Any]
     ) -> Dict[str, Any]:
-        valid_ids = [t["id"] for t in self.TEMPLATES]
+        valid_ids = [t["id"] for t in self.list_templates()]
         if template_id not in valid_ids:
             template_id = "classic-two-line"
+        template = next(t for t in self.list_templates() if t["id"] == template_id)
+        aspect_ratio = settings.get("aspect_ratio", "16:9")
+        if aspect_ratio not in template.get("supported_aspect_ratios", ["16:9", "9:16", "1:1"]):
+            return {"status": "invalid", "message": f"Template {template_id} does not support {aspect_ratio}"}
         return {"status": "valid", "template_id": template_id}
 
     @staticmethod
@@ -125,7 +143,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         output_path: Path
     ) -> Path:
         output_ass = output_path.with_suffix(".ass")
-        tpl = next((t for t in self.TEMPLATES if t["id"] == template_id), self.TEMPLATES[0])
+        templates = self.list_templates()
+        tpl = next((t for t in templates if t["id"] == template_id), templates[0])
         self.generate_ass_subtitles(timeline, tpl, output_ass)
         return output_ass
 
@@ -140,7 +159,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         output_dir.mkdir(parents=True, exist_ok=True)
         output_ass = output_dir / "subtitles.ass"
 
-        tpl = next((t for t in self.TEMPLATES if t["id"] == template_id), self.TEMPLATES[0])
+        templates = self.list_templates()
+        tpl = next((t for t in templates if t["id"] == template_id), templates[0])
         self.generate_ass_subtitles(timeline, tpl, output_ass)
 
         duration_sec = max(timeline.audio.duration_ms / 1000.0, 5.0)

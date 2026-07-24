@@ -14,6 +14,9 @@ interface TemplateItem {
 }
 
 const DEFAULT_TEMPLATES: TemplateItem[] = [
+  { id: 'neon-orbit', name: 'Neon Orbit', renderer: 'remotion', description: 'Futuristic orbiting light trails with crisp, precise word pulses.', gradient: 'from-cyan-950 via-indigo-950 to-fuchsia-950' },
+  { id: 'paper-bloom', name: 'Paper Bloom', renderer: 'remotion', description: 'Warm tactile lyric cards with soft ink-like reveals.', gradient: 'from-amber-100 via-orange-200 to-rose-300' },
+  { id: 'signal-noir', name: 'Signal Noir', renderer: 'remotion', description: 'Monochrome broadcast texture with sharp lime signal highlights.', gradient: 'from-slate-950 via-zinc-900 to-black' },
   { id: 'editorial-motion', name: 'Editorial Motion', renderer: 'remotion', description: 'Magazine kinetic typography with spring physics, uppercase emphasis, and dark editorial backgrounds.', gradient: 'from-amber-900 to-stone-950' },
   { id: 'cinematic-fade', name: 'Cinematic Fade', renderer: 'remotion', description: 'Emotional serif typography with radial dark ambient gradients, camera zoom, and blur transitions.', gradient: 'from-violet-950 to-slate-950' },
   { id: 'whispering-wind', name: 'Whispering Wind', renderer: 'remotion', description: 'Floating wave motion, horizontal drift, particle dispersion, and serene visual cyan tones.', gradient: 'from-cyan-950 to-blue-950' },
@@ -75,7 +78,7 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
 
   const featuredIds = selectedRenderer === 'karaoke'
     ? ['classic-two-line', 'minimal-dark']
-    : ['aurora-pulse', 'glass-halo', 'solar-flare'];
+    : ['neon-orbit', 'paper-bloom', 'signal-noir'];
   const featuredTemplates = templates.filter((template) => featuredIds.includes(template.id));
   const additionalTemplates = templates.filter((template) => !featuredIds.includes(template.id));
   const visibleTemplates = showMore ? templates : featuredTemplates;

@@ -6,5 +6,6 @@
   "description": "Clean centered lyrics with minimal contrast and no decorative context lines.",
   "supported_aspect_ratios": ["16:9", "9:16", "1:1"],
   "timing_support": ["line", "word"],
-  "config_schema": {"font_size": {"type": "number", "default": 64}}
+  "config_schema": {"font_size": {"type": "number", "default": 64}},
+  "render_config": {"font_size": 64, "primary_color": "&H00FF00FF", "secondary_color": "&H00CCCCCC", "outline_color": "&H00000000", "back_color": "&H00000000", "alignment": 2}
 }

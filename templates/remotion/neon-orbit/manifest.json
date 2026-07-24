@@ -1,0 +1,11 @@
+{
+  "id": "neon-orbit",
+  "name": "Neon Orbit",
+  "renderer": "remotion",
+  "version": "1.0.0",
+  "description": "Futuristic cyan-violet lyric panels with orbiting light trails and precise word pulses.",
+  "preview_gradient": "from-cyan-950 via-indigo-950 to-fuchsia-950",
+  "supported_aspect_ratios": ["16:9", "9:16", "1:1"],
+  "timing_support": ["line", "word"],
+  "config_schema": {"motion_intensity": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.65}}
+}
