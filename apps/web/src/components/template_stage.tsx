@@ -45,10 +45,12 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
   onNext,
 }) => {
   const [templates, setTemplates] = useState<TemplateItem[]>(selectedRenderer === 'karaoke' ? KARAOKE_TEMPLATES : DEFAULT_TEMPLATES);
+  const [showMore, setShowMore] = useState(false);
 
   useEffect(() => {
     const fetchTemplates = async () => {
       setTemplates(selectedRenderer === 'karaoke' ? KARAOKE_TEMPLATES : DEFAULT_TEMPLATES);
+      setShowMore(false);
       try {
         const res = await fetch(`http://localhost:8005/api/v1/templates?renderer=${selectedRenderer}`);
         if (res.ok) {
@@ -71,11 +73,18 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
     fetchTemplates();
   }, [selectedRenderer]);
 
+  const featuredIds = selectedRenderer === 'karaoke'
+    ? ['classic-two-line', 'minimal-dark']
+    : ['aurora-pulse', 'glass-halo', 'solar-flare'];
+  const featuredTemplates = templates.filter((template) => featuredIds.includes(template.id));
+  const additionalTemplates = templates.filter((template) => !featuredIds.includes(template.id));
+  const visibleTemplates = showMore ? templates : featuredTemplates;
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn">
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-extrabold text-white tracking-tight">Choose Template & Aspect Ratio</h2>
-        <p className="text-gray-400 text-sm">Select a visual template configured for the <span className="text-indigo-400 font-semibold uppercase">{selectedRenderer}</span> engine.</p>
+        <p className="text-gray-400 text-sm">Choose a style. Your synchronized timing stays unchanged.</p>
       </div>
 
       {/* Aspect Ratio Selector */}
@@ -106,7 +115,7 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
 
       {/* Template Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {templates.map((tpl) => {
+        {visibleTemplates.map((tpl) => {
           const isSelected = selectedTemplate === tpl.id;
           return (
             <div
@@ -137,6 +146,18 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
           );
         })}
       </div>
+
+      {additionalTemplates.length > 0 && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => setShowMore((current) => !current)}
+            className="text-xs font-semibold text-indigo-300 hover:text-white border border-surfaceBorder hover:border-indigo-400 rounded-full px-4 py-2 transition-colors"
+          >
+            {showMore ? 'Show featured styles' : `More styles (${additionalTemplates.length})`}
+          </button>
+        </div>
+      )}
 
       <div className="flex justify-end pt-4">
         <button
