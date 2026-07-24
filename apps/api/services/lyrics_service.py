@@ -145,5 +145,21 @@ class LyricsService:
                 words=word_objects
             )
             lines.append(line_obj)
+            
+        # Distribute timings evenly as a baseline before alignment
+        if lines:
+            word_count = sum(len(line.words) for line in lines)
+            ms_per_word = total_duration_ms // max(1, word_count)
+            
+            current_ms = 0
+            for line in lines:
+                if not line.words:
+                    continue
+                line.start_ms = current_ms
+                for w in line.words:
+                    w.start_ms = current_ms
+                    w.end_ms = current_ms + ms_per_word
+                    current_ms += ms_per_word
+                line.end_ms = current_ms
 
         return sections, lines

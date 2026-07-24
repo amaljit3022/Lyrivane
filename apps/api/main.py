@@ -225,12 +225,8 @@ async def upload_audio(project_id: str, file: UploadFile = File(...)):
     with open(dest_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    file_ext = dest_path.suffix.lower()
-    working_audio_path = dest_path
-
-    if file_ext in [".mp4", ".mkv", ".webm"]:
-        working_audio_path = project_dir / "audio" / "working" / f"{dest_path.stem}.wav"
-        AudioService.extract_audio_from_video(dest_path, working_audio_path)
+    working_audio_path = project_dir / "audio" / "working" / f"{dest_path.stem}.wav"
+    AudioService.extract_audio_from_video(dest_path, working_audio_path)
 
     audio_meta = AudioService.probe_audio(working_audio_path)
     audio_meta.original_file = str(dest_path)
