@@ -129,6 +129,9 @@ def _run_render_job(
             template_id=template_id,
             settings=settings,
             output_path=output_video_path,
+            progress_callback=lambda percent, message: RenderJobService.update_progress(
+                job_id, percent, message, "processing"
+            ),
         )
         if not rendered_path.exists() or rendered_path.stat().st_size < 1000:
             raise RuntimeError("Renderer completed without producing a usable MP4 file")

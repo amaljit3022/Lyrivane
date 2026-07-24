@@ -1,6 +1,6 @@
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 from renderers.base_renderer import RendererAdapter
 from schemas.project import CanonicalTimeline
 
@@ -140,7 +140,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         timeline: CanonicalTimeline,
         template_id: str,
         settings: Dict[str, Any],
-        output_path: Path
+        output_path: Path,
+        progress_callback: Optional[Callable[[int, str], None]] = None,
     ) -> Path:
         output_ass = output_path.with_suffix(".ass")
         templates = self.list_templates()
@@ -153,7 +154,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         timeline: CanonicalTimeline,
         template_id: str,
         settings: Dict[str, Any],
-        output_path: Path
+        output_path: Path,
+        progress_callback: Optional[Callable[[int, str], None]] = None,
     ) -> Path:
         output_dir = output_path.parent
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -192,7 +194,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         ]
 
         try:
+            if progress_callback:
+                progress_callback(20, "Generating lyric subtitle layers...")
             res = subprocess.run(cmd, cwd=output_dir, capture_output=True, text=True, check=True)
+            if progress_callback:
+                progress_callback(96, "Encoding final video and audio...")
         except subprocess.CalledProcessError as e:
             print(f"FFmpeg render failed with code {e.returncode}")
             print(f"STDOUT: {e.stdout}")

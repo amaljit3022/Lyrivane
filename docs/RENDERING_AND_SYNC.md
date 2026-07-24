@@ -51,7 +51,7 @@ Remotion templates live in `apps/remotion/src/templates/` and their metadata liv
 
 Template manifests are the discovery contract for both engines. They declare supported aspect ratios and timing support; the API rejects unsupported renderer, codec, FPS, resolution, or aspect-ratio combinations before a render starts. Karaoke keeps only renderer-specific ASS style defaults in Python while its names, descriptions, and supported formats come from the manifest.
 
-Rendering is asynchronous. `POST /api/v1/projects/{project_id}/render` returns a job ID immediately; the web client polls `/render-status/{job_id}` until `completed` or `failed`. The progress bar is driven only by that job state. Remotion audio is copied temporarily into `apps/remotion/public/render-assets/` and resolved with `staticFile()` so container paths are never mistaken for browser URLs.
+Rendering is asynchronous. `POST /api/v1/projects/{project_id}/render` returns a job ID immediately; the web client polls `/render-status/{job_id}` until `completed` or `failed`. The progress bar is driven only by that job state. Remotion emits bundle, frame, and final-encoding events as newline-delimited JSON; the API maps those events to real progress percentages and reports encoded-frame counts in the stage message. Remotion audio is copied temporarily into `apps/remotion/public/render-assets/` and resolved with `staticFile()` so container paths are never mistaken for browser URLs.
 
 The web preview is a template-aware lightweight preview. It uses the same template IDs and visual language as the Remotion compositions while keeping the synchronized timeline in the browser; the final export still uses the authoritative Remotion renderer.
 

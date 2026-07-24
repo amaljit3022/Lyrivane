@@ -4,7 +4,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 from renderers.base_renderer import RendererAdapter
 from schemas.project import CanonicalTimeline
 
@@ -129,7 +129,8 @@ class RemotionRendererAdapter(RendererAdapter):
         timeline: CanonicalTimeline,
         template_id: str,
         settings: Dict[str, Any],
-        output_path: Path
+        output_path: Path,
+        progress_callback: Optional[Callable[[int, str], None]] = None,
     ) -> Path:
         props = self.prepare_remotion_props(timeline, template_id, settings)
         props_path = output_path.with_suffix(".json")
@@ -142,7 +143,8 @@ class RemotionRendererAdapter(RendererAdapter):
         timeline: CanonicalTimeline,
         template_id: str,
         settings: Dict[str, Any],
-        output_path: Path
+        output_path: Path,
+        progress_callback: Optional[Callable[[int, str], None]] = None,
     ) -> Path:
         output_dir = output_path.parent
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -162,29 +164,61 @@ class RemotionRendererAdapter(RendererAdapter):
                 json.dump(props, f, indent=2)
 
             cmd = [
-                "npx", "--no-install", "remotion", "render",
+                "node", "scripts/render_with_progress.mjs",
                 "src/index.ts",
                 "LyrivaneComposition",
                 str(output_path.resolve()),
                 "--props", str(props_path.resolve()),
-                "--concurrency=1",
+                "h265" if str(settings.get("codec", "h264")).lower() in {"h265", "hevc"} else "h264",
             ]
-            codec = str(settings.get("codec", "h264")).lower()
-            if codec in {"h264", "h265", "hevc"}:
-                cmd.extend(["--codec", "h265" if codec in {"h265", "hevc"} else "h264"])
+            process = subprocess.Popen(
+                cmd,
+                cwd=remotion_cwd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+            output_lines: List[str] = []
+            assert process.stdout is not None
+            for raw_line in process.stdout:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                output_lines.append(line)
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not progress_callback:
+                    continue
+                if event.get("type") == "bundle":
+                    progress_callback(10, "Preparing Remotion composition...")
+                elif event.get("type") == "render":
+                    render_progress = max(0.0, min(1.0, float(event.get("progress", 0.0))))
+                    percent = 10 + round(render_progress * 85)
+                    frames = event.get("encodedFrames", event.get("renderedFrames", 0))
+                    total = event.get("totalFrames")
+                    frame_text = f" ({frames}/{total} frames)" if total else ""
+                    progress_callback(percent, f"Rendering Remotion frames{frame_text}...")
+                elif event.get("type") == "stitch":
+                    progress_callback(96, "Encoding final video and audio...")
 
-            result = subprocess.run(cmd, cwd=remotion_cwd, capture_output=True, text=True, check=False)
-            if result.returncode != 0:
-                raise RuntimeError(result.stderr[-4000:] or result.stdout[-4000:])
+            return_code = process.wait()
+            if return_code != 0:
+                raise RuntimeError("\n".join(output_lines[-40:]) or "Remotion render process failed")
             if not output_path.exists() or output_path.stat().st_size < 1000:
                 raise RuntimeError("Remotion completed without creating a usable MP4")
         except Exception as exc:
             logger.exception("Remotion render failed; using FFmpeg fallback: %s", exc)
+            if progress_callback:
+                progress_callback(96, "Remotion unavailable; using lyric-safe FFmpeg fallback...")
             # Keep lyrics and the original soundtrack in the fallback. A blank
             # color card is not a valid export for this application.
             from renderers.karaoke_renderer import KaraokeRendererAdapter
             fallback_path = KaraokeRendererAdapter().render(
-                timeline, "classic-two-line", {}, output_path
+                timeline, "classic-two-line", {}, output_path,
+                progress_callback=progress_callback,
             )
             if not fallback_path.exists() or fallback_path.stat().st_size < 1000:
                 raise RuntimeError("Lyric-capable fallback failed to produce an MP4")

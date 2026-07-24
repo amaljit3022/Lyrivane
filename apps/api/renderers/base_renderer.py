@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 from schemas.project import CanonicalTimeline
 
 
@@ -32,7 +32,8 @@ class RendererAdapter(ABC):
         timeline: CanonicalTimeline,
         template_id: str,
         settings: Dict[str, Any],
-        output_path: Path
+        output_path: Path,
+        progress_callback: Optional[Callable[[int, str], None]] = None,
     ) -> Path:
         """Create interactive browser-compatible preview asset or draft snippet."""
         raise NotImplementedError
@@ -43,7 +44,8 @@ class RendererAdapter(ABC):
         timeline: CanonicalTimeline,
         template_id: str,
         settings: Dict[str, Any],
-        output_path: Path
+        output_path: Path,
+        progress_callback: Optional[Callable[[int, str], None]] = None,
     ) -> Path:
         """Render high-resolution final video with audio multiplexing."""
         raise NotImplementedError
