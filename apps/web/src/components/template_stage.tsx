@@ -22,6 +22,11 @@ const DEFAULT_TEMPLATES: TemplateItem[] = [
   { id: 'solar-flare', name: 'Solar Flare', renderer: 'remotion', description: 'Warm central lyrics with a restrained cinematic flare.', gradient: 'from-orange-900 to-rose-950' },
 ];
 
+const KARAOKE_TEMPLATES: TemplateItem[] = [
+  { id: 'classic-two-line', name: 'Central Aurora', renderer: 'karaoke', description: 'Centered lyrics with active-word highlighting and a dark contrast panel.', gradient: 'from-cyan-900 to-violet-950' },
+  { id: 'minimal-dark', name: 'Minimal Dark', renderer: 'karaoke', description: 'Clean centered lyrics with restrained contrast and word highlighting.', gradient: 'from-slate-900 to-black' },
+];
+
 interface TemplateStageProps {
   selectedRenderer: string;
   selectedTemplate: string;
@@ -39,10 +44,11 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
   onSelectAspectRatio,
   onNext,
 }) => {
-  const [templates, setTemplates] = useState<TemplateItem[]>(DEFAULT_TEMPLATES);
+  const [templates, setTemplates] = useState<TemplateItem[]>(selectedRenderer === 'karaoke' ? KARAOKE_TEMPLATES : DEFAULT_TEMPLATES);
 
   useEffect(() => {
     const fetchTemplates = async () => {
+      setTemplates(selectedRenderer === 'karaoke' ? KARAOKE_TEMPLATES : DEFAULT_TEMPLATES);
       try {
         const res = await fetch(`http://localhost:8005/api/v1/templates?renderer=${selectedRenderer}`);
         if (res.ok) {
