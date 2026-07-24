@@ -57,6 +57,9 @@ class RenderRequest(BaseModel):
     motion_intensity: float = 0.5
 
 
+SUPPORTED_RENDERERS = {"karaoke": KaraokeRendererAdapter, "remotion": RemotionRendererAdapter}
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "app": "LyricFlow Studio API", "version": "1.0.0"}
@@ -378,13 +381,19 @@ def render_video(project_id: str, req: RenderRequest):
             lines=[LineTiming(**l) for l in lines_raw]
         )
 
-    if req.renderer == "remotion":
-        renderer = RemotionRendererAdapter()
-    else:
-        renderer = KaraokeRendererAdapter()
+    renderer_class = SUPPORTED_RENDERERS.get(req.renderer)
+    if renderer_class is None:
+        raise HTTPException(status_code=422, detail=f"Unsupported renderer: {req.renderer}")
+    renderer = renderer_class()
+    validation = renderer.validate_project(
+        timeline,
+        req.template_id,
+        {"aspect_ratio": req.aspect_ratio, "fps": req.fps, "resolution": req.resolution, "codec": req.codec},
+    )
+    resolved_template_id = validation["template_id"]
     rendered_path = renderer.render(
         timeline=timeline,
-        template_id=req.template_id,
+        template_id=resolved_template_id,
         settings={
             "resolution": req.resolution, 
             "fps": req.fps, 
@@ -401,7 +410,7 @@ def render_video(project_id: str, req: RenderRequest):
         "status": "success",
         "project_id": project_id,
         "renderer": req.renderer,
-        "template_id": req.template_id,
+        "template_id": resolved_template_id,
         "output_file": str(rendered_path),
         "download_url": f"/api/v1/projects/{project_id}/renders/download"
     }
@@ -415,33 +424,7 @@ def download_rendered_video(project_id: str):
     output_video = output_dir / "output.mp4"
 
     if not output_video.exists() or output_video.stat().st_size < 1000:
-        renderer = KaraokeRendererAdapter()
-        project = projects_db.get(project_id, {})
-        audio_meta = project.get("audio_meta") or AudioMetadata(original_file="", duration_ms=10000)
-        lines_raw = project.get("lines") or [
-            {
-                "id": "l-demo",
-                "display_text": "Golden Stars - LyricFlow Studio",
-                "alignment_text": "golden stars lyricflow studio",
-                "start_ms": 1000,
-                "end_ms": 9000,
-                "words": [
-                    {"id": "w-1", "display_text": "Golden", "alignment_text": "golden", "start_ms": 1000, "end_ms": 3000},
-                    {"id": "w-2", "display_text": "Stars", "alignment_text": "stars", "start_ms": 3000, "end_ms": 5000},
-                    {"id": "w-3", "display_text": "LyricFlow", "alignment_text": "lyricflow", "start_ms": 5000, "end_ms": 7000},
-                    {"id": "w-4", "display_text": "Studio", "alignment_text": "studio", "start_ms": 7000, "end_ms": 9000}
-                ]
-            }
-        ]
-
-        timeline = CanonicalTimeline(
-            project_id=project_id,
-            title=project.get("title", "Golden Stars"),
-            artist=project.get("artist", "Krittika"),
-            audio=audio_meta,
-            lines=[LineTiming(**l) for l in lines_raw]
-        )
-        renderer.render(timeline, "classic-two-line", {}, output_video)
+        raise HTTPException(status_code=404, detail="No rendered video is available for this project")
 
     project = projects_db.get(project_id, {})
     title = project.get("title", "Untitled").replace(" ", "_")

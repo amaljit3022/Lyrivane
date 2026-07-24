@@ -12,7 +12,7 @@ import { AdvancedEditorDrawer } from '@/components/advanced_editor_drawer';
 export default function HomePage() {
   const [currentStage, setCurrentStage] = useState(1);
   const [selectedRenderer, setSelectedRenderer] = useState('remotion');
-  const [selectedTemplate, setSelectedTemplate] = useState('editorial-motion');
+  const [selectedTemplate, setSelectedTemplate] = useState('aurora-pulse');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [projectId, setProjectId] = useState<string>('demo');
@@ -114,8 +114,7 @@ export default function HomePage() {
             onSelectRenderer={(renId) => {
               setSelectedRenderer(renId);
               if (renId === 'karaoke') setSelectedTemplate('classic-two-line');
-              if (renId === 'remotion') setSelectedTemplate('editorial-motion');
-              if (renId === 'blender') setSelectedTemplate('rainy-window');
+              if (renId === 'remotion') setSelectedTemplate('aurora-pulse');
             }}
             onNext={() => setCurrentStage(3)}
           />

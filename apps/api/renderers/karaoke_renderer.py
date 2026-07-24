@@ -33,15 +33,6 @@ class KaraokeRendererAdapter(RendererAdapter):
             "font_size": 44,
             "alignment": 2
         },
-        {
-            "id": "album-art-bg",
-            "name": "Album Art Focus",
-            "description": "Blurred album cover with sleek bottom lyrics overlay.",
-            "primary_color": "&H0000FFFF",  # Cyan
-            "secondary_color": "&H00EEEEEE",
-            "font_size": 40,
-            "alignment": 2
-        }
     ]
 
     def list_templates(self) -> List[Dict[str, Any]]:
@@ -57,6 +48,17 @@ class KaraokeRendererAdapter(RendererAdapter):
         if template_id not in valid_ids:
             template_id = "classic-two-line"
         return {"status": "valid", "template_id": template_id}
+
+    @staticmethod
+    def output_dimensions(resolution: str, aspect_ratio: str) -> tuple[int, int]:
+        heights = {"1080p": 1080, "1440p": 1440, "4K": 2160}
+        height = heights.get(resolution, 1080)
+        width = round(height * 16 / 9)
+        if aspect_ratio == "9:16":
+            width, height = height, width
+        elif aspect_ratio == "1:1":
+            width = height
+        return width, height
 
     @staticmethod
     def generate_ass_subtitles(timeline: CanonicalTimeline, template: Dict[str, Any], output_ass_path: Path) -> Path:
@@ -142,6 +144,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         self.generate_ass_subtitles(timeline, tpl, output_ass)
 
         duration_sec = max(timeline.audio.duration_ms / 1000.0, 5.0)
+        width, height = self.output_dimensions(
+            str(settings.get("resolution", "1080p")),
+            str(settings.get("aspect_ratio", "16:9")),
+        )
+        fps = max(1, int(settings.get("fps", 30)))
+        codec = "libx265" if str(settings.get("codec", "h264")).lower() in {"h265", "hevc"} else "libx264"
 
         # Check if original audio file exists
         audio_file_path = Path(timeline.audio.original_file)
@@ -152,11 +160,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
         cmd = [
             "ffmpeg", "-y",
-            "-f", "lavfi", "-i", f"color=c=0x090d16:s=1920x1080:d={duration_sec}",
+            "-f", "lavfi", "-i", f"color=c=0x090d16:s={width}x{height}:d={duration_sec}:r={fps}",
             *audio_args,
             "-vf", f"subtitles={output_ass.name}",
             "-map", "0:v:0", "-map", "1:a:0",
-            "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+            "-c:v", codec, "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+            "-r", str(fps),
             "-c:a", "aac", "-b:a", "192k",
             "-shortest",
             output_path.name

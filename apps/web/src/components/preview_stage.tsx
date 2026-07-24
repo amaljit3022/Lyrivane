@@ -53,12 +53,15 @@ export const PreviewStage: React.FC<PreviewStageProps> = ({
               display_text: l.display_text,
               start_ms: l.start_ms,
               end_ms: l.end_ms,
-              words: l.words || []
+              words: (l.words || []).map((w: any) => ({
+                text: w.text ?? w.display_text ?? '',
+                start_ms: w.start_ms,
+                end_ms: w.end_ms,
+              }))
             })));
           }
-          if (data.audio_meta && data.audio_meta.duration_ms) {
-            setDurationMs(data.audio_meta.duration_ms);
-          }
+          const projectDuration = data.audio_meta?.duration_ms || data.canonical_timeline?.audio?.duration_ms;
+          if (projectDuration) setDurationMs(projectDuration);
         }
 
         if (planRes.ok) {
@@ -106,7 +109,8 @@ export const PreviewStage: React.FC<PreviewStageProps> = ({
 
   const activeLine = lyrics.find(
     (l) => currentTimeMs >= l.start_ms && currentTimeMs <= l.end_ms
-  ) || lyrics.find(l => l.start_ms > currentTimeMs) || lyrics[0] || { display_text: 'Music Playing...', start_ms: 0, end_ms: 0 };
+  );
+  const nextLine = lyrics.find(l => l.start_ms > currentTimeMs);
 
   const formatTime = (ms: number) => {
     const totalSecs = Math.floor(ms / 1000);
@@ -156,11 +160,11 @@ export const PreviewStage: React.FC<PreviewStageProps> = ({
                 {/* Animated Word Display */}
                 <div className="text-center space-y-4 max-w-2xl px-4">
                   <p className={`text-3xl sm:text-5xl font-extrabold text-white tracking-tight drop-shadow-2xl transition-all duration-300 ${
-                    currentTimeMs >= activeLine.start_ms && currentTimeMs <= activeLine.end_ms ? 'scale-105 opacity-100' : 'opacity-50'
+                    activeLine ? 'scale-105 opacity-100' : 'opacity-50'
                   }`}>
-                    {activeLine.display_text}
+                    {activeLine?.display_text || (nextLine ? 'Waiting for the next line…' : 'Music Playing…')}
                   </p>
-                  {activeLine.words && activeLine.words.length > 0 && (
+                  {activeLine?.words && activeLine.words.length > 0 && (
                     <div className="flex flex-wrap justify-center gap-2 pt-2">
                       {activeLine.words.map((w, i) => {
                         const isCurrentWord = currentTimeMs >= w.start_ms && currentTimeMs <= w.end_ms;

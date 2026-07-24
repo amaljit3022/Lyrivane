@@ -10,6 +10,19 @@
 
 The calculation/alignment code remains independent of the web UI. The final renderer receives the already-aligned timeline and must never re-run synchronization.
 
+## Implemented renderer matrix
+
+| Engine | Status | Templates exposed in the UI |
+|---|---|---|
+| FFmpeg/ASS Karaoke | Implemented | Central Aurora, Minimal Dark |
+| Remotion | Implemented | Aurora Pulse, Glass Halo, Solar Flare, Editorial Motion, Cinematic Fade, Whispering Wind |
+| Blender | Not implemented | Hidden until a real renderer, manifest, and export test exist |
+
+The UI only lists engines and templates that have a backend implementation. A
+template is considered real only when its manifest, renderer mapping, and export
+path agree on the same ID. Resolution, aspect ratio, FPS, and codec settings are
+passed into the renderer; they are not presentation-only controls.
+
 ## Repeated-chorus protection
 
 The earlier global `SequenceMatcher` approach could match a repeated phrase much later in the song. In the observed failure, the timeline jumped from approximately 171 seconds to 336.9 seconds.

@@ -44,6 +44,7 @@ class RemotionRendererAdapter(RendererAdapter):
         audio_analysis = AudioAnalysisService.analyze_audio(audio_path, duration_ms=timeline.audio.duration_ms)
 
         aspect_ratio = settings.get("aspect_ratio", "16:9")
+        resolution = settings.get("resolution", "1080p")
         visual_plan = VisualIntelligenceService.generate_visual_plan(
             timeline=timeline,
             style=template_id,
@@ -95,6 +96,8 @@ class RemotionRendererAdapter(RendererAdapter):
             "audio_url": audio_file,
             "duration_in_frames": int((timeline.audio.duration_ms / 1000.0) * settings.get("fps", 30)),
             "fps": settings.get("fps", 30),
+            "resolution": resolution,
+            "codec": settings.get("codec", "h264"),
             "template_id": template_id,
             "aspect_ratio": aspect_ratio,
             "lines": formatted_lines,
@@ -137,6 +140,9 @@ class RemotionRendererAdapter(RendererAdapter):
             "--props", str(props_path.resolve()),
             "--concurrency=1",
         ]
+        codec = str(settings.get("codec", "h264")).lower()
+        if codec in {"h264", "h265", "hevc"}:
+            cmd.extend(["--codec", "h265" if codec in {"h265", "hevc"} else "h264"])
 
         remotion_cwd = Path(os.getenv("REMOTION_DIR", "/app/remotion"))
         if not remotion_cwd.exists():

@@ -25,6 +25,8 @@ export type LyrivaneProps = {
   lines: LineTiming[];
   template_id?: string;
   aspect_ratio?: "16:9" | "9:16" | "1:1";
+  resolution?: "1080p" | "1440p" | "4K";
+  fps?: number;
   audio_analysis?: AudioAnalysisProps;
 };
 

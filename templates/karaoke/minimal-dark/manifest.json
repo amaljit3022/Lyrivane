@@ -1,0 +1,10 @@
+{
+  "id": "minimal-dark",
+  "name": "Minimal Dark",
+  "renderer": "karaoke",
+  "version": "1.0.0",
+  "description": "Clean centered lyrics with minimal contrast and no decorative context lines.",
+  "supported_aspect_ratios": ["16:9", "9:16", "1:1"],
+  "timing_support": ["line", "word"],
+  "config_schema": {"font_size": {"type": "number", "default": 64}}
+}

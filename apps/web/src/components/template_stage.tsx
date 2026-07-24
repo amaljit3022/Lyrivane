@@ -10,12 +10,16 @@ interface TemplateItem {
   description: string;
   gradient?: string;
   supported_aspect_ratios?: string[];
+  preview_gradient?: string;
 }
 
 const DEFAULT_TEMPLATES: TemplateItem[] = [
   { id: 'editorial-motion', name: 'Editorial Motion', renderer: 'remotion', description: 'Magazine kinetic typography with spring physics, uppercase emphasis, and dark editorial backgrounds.', gradient: 'from-amber-900 to-stone-950' },
   { id: 'cinematic-fade', name: 'Cinematic Fade', renderer: 'remotion', description: 'Emotional serif typography with radial dark ambient gradients, camera zoom, and blur transitions.', gradient: 'from-violet-950 to-slate-950' },
   { id: 'whispering-wind', name: 'Whispering Wind', renderer: 'remotion', description: 'Floating wave motion, horizontal drift, particle dispersion, and serene visual cyan tones.', gradient: 'from-cyan-950 to-blue-950' },
+  { id: 'aurora-pulse', name: 'Aurora Pulse', renderer: 'remotion', description: 'Central lyric stage with glowing word emphasis and soft aurora motion.', gradient: 'from-cyan-900 to-violet-950' },
+  { id: 'glass-halo', name: 'Glass Halo', renderer: 'remotion', description: 'Centered lyrics inside a calm translucent glass frame.', gradient: 'from-violet-900 to-slate-950' },
+  { id: 'solar-flare', name: 'Solar Flare', renderer: 'remotion', description: 'Warm central lyrics with a restrained cinematic flare.', gradient: 'from-orange-900 to-rose-950' },
 ];
 
 interface TemplateStageProps {
@@ -49,7 +53,8 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
               name: t.name,
               renderer: t.renderer || selectedRenderer,
               description: t.description || 'Custom kinetic typography template.',
-              gradient: DEFAULT_TEMPLATES[i % DEFAULT_TEMPLATES.length].gradient
+              gradient: t.preview_gradient || DEFAULT_TEMPLATES[i % DEFAULT_TEMPLATES.length].gradient,
+              supported_aspect_ratios: t.supported_aspect_ratios || ['16:9', '9:16', '1:1']
             })));
           }
         }
