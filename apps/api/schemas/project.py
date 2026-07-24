@@ -105,5 +105,8 @@ class ProjectResponse(BaseModel):
     created_at: str
     has_audio: bool = False
     has_lyrics: bool = False
+    audio_meta: Optional[AudioMetadata] = None
+    sections: List[SectionTiming] = Field(default_factory=list)
+    lines: List[LineTiming] = Field(default_factory=list)
     sync_progress: Optional[Dict[str, Any]] = None
     canonical_timeline: Optional[CanonicalTimeline] = None

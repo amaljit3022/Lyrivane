@@ -1,5 +1,6 @@
 import React from "react";
 import { AbsoluteFill, Audio, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { resolveAudioSource } from "../audio/resolveAudioSource";
 
 export type CentralWord = {
   text: string;
@@ -67,7 +68,7 @@ export const CentralLyricStage: React.FC<CentralStageProps> = ({ audioUrl, lines
 
   return (
     <AbsoluteFill style={{ background: isPaper ? `radial-gradient(circle at 20% 18%, rgba(255,255,255,.9), transparent 30%), linear-gradient(135deg, ${palette.bg}, #e6c9ae)` : `radial-gradient(circle at 50% 46%, ${palette.glow} 0%, transparent 36%), linear-gradient(140deg, ${palette.bg}, #05060d 72%)`, color: isPaper ? "#2b211d" : "#f8fbff", fontFamily: isPaper ? "Georgia, serif" : isSignal ? "ui-monospace, SFMono-Regular, monospace" : "Inter, system-ui, sans-serif", overflow: "hidden" }}>
-      {audioUrl && <Audio src={audioUrl} />}
+      {audioUrl && <Audio src={resolveAudioSource(audioUrl)} />}
       {variant === "neon" && <>
         <div style={{ position: "absolute", width: "72vw", height: "72vw", maxWidth: 1100, maxHeight: 1100, border: `1px solid ${palette.accent}55`, borderRadius: "50%", transform: `rotate(${frame * .18}deg)`, boxShadow: `0 0 32px ${palette.glow}` }} />
         <div style={{ position: "absolute", width: "46vw", height: "18vw", border: `1px solid ${palette.accent2}66`, borderRadius: "50%", transform: `rotate(${-frame * .32}deg)`, boxShadow: `0 0 28px ${palette.accent2}44` }} />

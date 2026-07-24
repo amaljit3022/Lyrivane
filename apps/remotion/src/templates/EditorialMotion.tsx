@@ -3,6 +3,7 @@ import { AbsoluteFill, Audio, Sequence, useVideoConfig } from "remotion";
 import { LayoutEngine } from "../typography/LayoutEngine";
 import { WordCompositionProps } from "../typography/WordRenderer";
 import { AudioAnalysisProps } from "../audio/useAudioReactive";
+import { resolveAudioSource } from "../audio/resolveAudioSource";
 
 export type LineTiming = {
   id: string;
@@ -35,7 +36,7 @@ export const EditorialMotion: React.FC<EditorialProps> = ({
         fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}
     >
-      {audioUrl && <Audio src={audioUrl} />}
+      {audioUrl && <Audio src={resolveAudioSource(audioUrl)} />}
 
       {lines.map((line, i) => {
         const startFrame = Math.round((line.start_ms / 1000) * fps);

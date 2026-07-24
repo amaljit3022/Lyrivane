@@ -21,6 +21,7 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
   const [codec, setCodec] = useState('h264');
   const [isRendering, setIsRendering] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [stageMessage, setStageMessage] = useState('Preparing render...');
   const [isComplete, setIsComplete] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string>(
     `http://localhost:8005/api/v1/projects/${projectId || 'demo'}/renders/download`
@@ -30,7 +31,8 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
 
   const startRender = async () => {
     setIsRendering(true);
-    setProgress(10);
+    setProgress(0);
+    setStageMessage('Submitting render job...');
     setIsComplete(false);
     setOutputFolderMsg(null);
     setErrorMsg(null);
@@ -55,6 +57,30 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
       if (response.ok) {
         const data = await response.json();
         setDownloadUrl(`http://localhost:8005${data.download_url}`);
+        if (!data.job_id || !data.progress_url) {
+          throw new Error('Render service returned no job status endpoint');
+        }
+
+        let completed = false;
+        while (!completed) {
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          const statusResponse = await fetch(`http://localhost:8005${data.progress_url}`);
+          if (!statusResponse.ok) {
+            throw new Error(`Unable to read render progress (${statusResponse.status})`);
+          }
+          const status = await statusResponse.json();
+          setProgress(Math.max(0, status.progress_percentage ?? 0));
+          setStageMessage(status.stage_message || 'Rendering video...');
+
+          if (status.status === 'completed') {
+            completed = true;
+          } else if (status.status === 'failed') {
+            throw new Error(status.stage_message || 'Video generation failed');
+          }
+        }
+        setProgress(100);
+        setIsRendering(false);
+        setIsComplete(true);
       } else {
         const message = await response.text();
         throw new Error(message || `Render failed (${response.status})`);
@@ -66,17 +92,6 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
       return;
     }
 
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsRendering(false);
-          setIsComplete(true);
-          return 100;
-        }
-        return prev + 25;
-      });
-    }, 600);
   };
 
   const handleDownload = () => {
@@ -196,7 +211,7 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <p className="text-xs text-gray-400 animate-pulse">Encoding frames and multiplexing original master audio...</p>
+            <p className="text-xs text-gray-400 animate-pulse">{stageMessage}</p>
           </div>
         )}
 

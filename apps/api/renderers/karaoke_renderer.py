@@ -172,7 +172,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         codec = "libx265" if str(settings.get("codec", "h264")).lower() in {"h265", "hevc"} else "libx264"
 
         # Check if original audio file exists
-        audio_file_path = Path(timeline.audio.original_file)
+        audio_file_path = Path(timeline.audio.working_file or timeline.audio.original_file)
         if audio_file_path.exists() and audio_file_path.is_file() and audio_file_path.stat().st_size > 0:
             audio_args = ["-i", str(audio_file_path.resolve())]
         else:

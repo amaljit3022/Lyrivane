@@ -22,6 +22,7 @@ from services.audio_service import AudioService
 from services.lyrics_service import LyricsService
 from services.alignment_service import AlignmentService
 from services.template_service import TemplateService
+from services.render_job_service import RenderJobService
 from services.visual_intelligence import VisualIntelligenceService
 from renderers.karaoke_renderer import KaraokeRendererAdapter
 from renderers.remotion_renderer import RemotionRendererAdapter
@@ -45,6 +46,98 @@ PROJECTS_DIR = Path(os.getenv("PROJECTS_DIR", "./projects")).resolve()
 PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
 
 projects_db: Dict[str, Dict[str, Any]] = {}
+
+
+def _persist_project(project_id: str, project: Dict[str, Any]) -> None:
+    """Persist the small project envelope so API restarts do not lose the active project."""
+    project_dir = PROJECTS_DIR / project_id
+    project_dir.mkdir(parents=True, exist_ok=True)
+    payload = dict(project)
+    if isinstance(payload.get("audio_meta"), BaseModel):
+        payload["audio_meta"] = payload["audio_meta"].model_dump(mode="json")
+    (project_dir / "project.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def _load_project(project_id: str) -> Optional[Dict[str, Any]]:
+    if project_id in projects_db:
+        return projects_db[project_id]
+    project_file = PROJECTS_DIR / project_id / "project.json"
+    if not project_file.exists():
+        # Recover projects created before project.json persistence was added.
+        project_dir = PROJECTS_DIR / project_id
+        working_files = sorted((project_dir / "audio" / "working").glob("*.wav"))
+        timeline_file = project_dir / "timeline.json"
+        if not working_files and not timeline_file.exists():
+            return None
+        working_file = working_files[0] if working_files else None
+        original_files = sorted((project_dir / "audio" / "original").iterdir()) if (project_dir / "audio" / "original").exists() else []
+        original_file = original_files[0] if original_files else working_file
+        if not working_file:
+            return None
+        try:
+            audio_meta = AudioService.probe_audio(working_file)
+            audio_meta.original_file = str(original_file)
+            audio_meta.working_file = str(working_file)
+            timeline_data = json.loads(timeline_file.read_text(encoding="utf-8")) if timeline_file.exists() else {}
+            lines = timeline_data.get("lines", [])
+            project = {
+                "project_id": project_id,
+                "title": audio_meta.title or project_id,
+                "artist": audio_meta.artist or "Unknown Artist",
+                "language": "en",
+                "status": "synchronized" if lines else "audio_uploaded",
+                "created_at": "2026-07-21T00:00:00Z",
+                "has_audio": True,
+                "has_lyrics": bool(lines) or (project_dir / "lyrics" / "source" / "raw_lyrics.txt").exists(),
+                "audio_meta": audio_meta,
+                "sections": [],
+                "lines": lines,
+                "canonical_timeline": None,
+            }
+            projects_db[project_id] = project
+            _persist_project(project_id, project)
+            return project
+        except (OSError, json.JSONDecodeError, ValueError, TypeError):
+            return None
+    try:
+        project = json.loads(project_file.read_text(encoding="utf-8"))
+        if isinstance(project.get("audio_meta"), dict):
+            project["audio_meta"] = AudioMetadata(**project["audio_meta"])
+        projects_db[project_id] = project
+        return project
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+
+def _run_render_job(
+    job_id: str,
+    project_id: str,
+    renderer_name: str,
+    template_id: str,
+    timeline: CanonicalTimeline,
+    settings: Dict[str, Any],
+    output_video_path: Path,
+) -> None:
+    RenderJobService.update_progress(job_id, 5, "Preparing render assets...", "processing")
+    try:
+        renderer = SUPPORTED_RENDERERS[renderer_name]()
+        RenderJobService.update_progress(job_id, 10, f"Rendering with {template_id}...", "processing")
+        rendered_path = renderer.render(
+            timeline=timeline,
+            template_id=template_id,
+            settings=settings,
+            output_path=output_video_path,
+        )
+        if not rendered_path.exists() or rendered_path.stat().st_size < 1000:
+            raise RuntimeError("Renderer completed without producing a usable MP4 file")
+        RenderJobService.update_progress(job_id, 100, "Video generation complete.", "completed")
+        job = RenderJobService.get_job(job_id)
+        if job:
+            job.output_path = str(rendered_path)
+    except Exception as exc:
+        RenderJobService.update_progress(job_id, -1, f"Video generation failed: {exc}", "failed")
 
 
 class RenderRequest(BaseModel):
@@ -80,7 +173,7 @@ def get_visual_plan(
     aspect_ratio: str = "16:9",
     motion_intensity: float = 0.5
 ):
-    project = projects_db.get(project_id, {})
+    project = _load_project(project_id) or {}
     project_dir = PROJECTS_DIR / project_id
     audio_meta = project.get("audio_meta") or AudioMetadata(
         original_file=str(project_dir / "audio" / "original" / "song.mp3"),
@@ -151,12 +244,14 @@ def create_project(req: ProjectCreateRequest):
     }
 
     projects_db[project_id] = project_data
+    _persist_project(project_id, project_data)
     return ProjectResponse(**project_data)
 
 
 @app.get("/api/v1/projects/{project_id}", response_model=ProjectResponse)
 def get_project(project_id: str):
-    if project_id not in projects_db:
+    project = _load_project(project_id)
+    if project is None:
         dummy_project = {
             "project_id": project_id,
             "title": "Golden Stars",
@@ -174,8 +269,6 @@ def get_project(project_id: str):
         }
         return ProjectResponse(**dummy_project)
         
-    project = projects_db[project_id]
-    
     # Check for progress if we are synchronizing
     if project.get("status") == "synchronizing":
         project_dir = PROJECTS_DIR / project_id
@@ -206,6 +299,7 @@ def get_project(project_id: str):
             project["lines"] = [l.model_dump() for l in timeline.lines]
             project["status"] = "synchronized"
             project["sync_progress"] = {"message": "Synchronization complete!", "percent": 100}
+            _persist_project(project_id, project)
             
         elif progress_file.exists():
             try:
@@ -238,7 +332,8 @@ async def upload_audio(project_id: str, file: UploadFile = File(...)):
     audio_meta.original_file = str(dest_path)
     audio_meta.working_file = str(working_audio_path)
 
-    if project_id not in projects_db:
+    project = _load_project(project_id)
+    if project is None:
         projects_db[project_id] = {
             "project_id": project_id,
             "title": audio_meta.title or "Golden Stars",
@@ -253,8 +348,8 @@ async def upload_audio(project_id: str, file: UploadFile = File(...)):
             "lines": [],
             "canonical_timeline": None
         }
-    else:
         project = projects_db[project_id]
+    else:
         project["audio_meta"] = audio_meta
         project["has_audio"] = True
         if audio_meta.title:
@@ -263,14 +358,15 @@ async def upload_audio(project_id: str, file: UploadFile = File(...)):
             project["artist"] = audio_meta.artist
         project["status"] = "audio_uploaded"
 
-    return ProjectResponse(**projects_db[project_id])
+    _persist_project(project_id, project)
+    return ProjectResponse(**project)
 
 
 @app.get("/api/v1/projects/{project_id}/audio")
 def get_audio(project_id: str):
-    if project_id not in projects_db:
+    project = _load_project(project_id)
+    if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
-    project = projects_db[project_id]
     if not project.get("audio_meta") or not project["audio_meta"].working_file:
         raise HTTPException(status_code=404, detail="Audio not found")
     
@@ -300,7 +396,8 @@ async def upload_lyrics(
     else:
         raise HTTPException(status_code=400, detail="Provide raw_text or a file")
 
-    if project_id not in projects_db:
+    project = _load_project(project_id)
+    if project is None:
         projects_db[project_id] = {
             "project_id": project_id,
             "title": "Golden Stars",
@@ -316,7 +413,7 @@ async def upload_lyrics(
             "canonical_timeline": None
         }
 
-    project = projects_db[project_id]
+        project = projects_db[project_id]
     duration_ms = project["audio_meta"].duration_ms if project.get("audio_meta") else 180000
 
     sections, lines = LyricsService.process_raw_lyrics(content, total_duration_ms=duration_ms)
@@ -331,27 +428,28 @@ async def upload_lyrics(
     with open(project_dir / "lyrics" / "source" / "raw_lyrics.txt", "w", encoding="utf-8") as f:
         f.write(content)
 
+    _persist_project(project_id, project)
     return ProjectResponse(**project)
 
 
 @app.post("/api/v1/projects/{project_id}/synchronize", response_model=ProjectResponse)
 def trigger_synchronization(project_id: str):
-    if project_id not in projects_db:
+    project = _load_project(project_id)
+    if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    project = projects_db[project_id]
-    
     project["status"] = "synchronizing"
     project["sync_progress"] = {"message": "Queued for alignment...", "percent": 0}
     
     # Dispatch to Celery worker on the alignment queue
     celery_app.send_task("worker.align_lyrics", args=[project_id], queue="alignment")
 
+    _persist_project(project_id, project)
     return ProjectResponse(**project)
 
 
 @app.post("/api/v1/projects/{project_id}/render")
-def render_video(project_id: str, req: RenderRequest):
+def render_video(project_id: str, req: RenderRequest, background_tasks: BackgroundTasks):
     if req.resolution not in {"1080p", "1440p", "4K"}:
         raise HTTPException(status_code=422, detail="resolution must be 1080p, 1440p, or 4K")
     if req.aspect_ratio not in {"16:9", "9:16", "1:1"}:
@@ -366,15 +464,12 @@ def render_video(project_id: str, req: RenderRequest):
 
     output_video_path = renders_dir / "output.mp4"
 
-    project = projects_db.get(project_id, {})
-    audio_meta = project.get("audio_meta") or AudioMetadata(
-        original_file=str(project_dir / "audio" / "original" / "song.mp3"),
-        duration_ms=180000,
-        sample_rate=44100,
-        channels=2,
-        title=project.get("title", "Untitled"),
-        artist=project.get("artist", "Unknown")
-    )
+    project = _load_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    audio_meta = project.get("audio_meta")
+    if not audio_meta:
+        raise HTTPException(status_code=422, detail="Upload audio before rendering")
 
     if project.get("canonical_timeline"):
         timeline_dict = project["canonical_timeline"]
@@ -403,28 +498,52 @@ def render_video(project_id: str, req: RenderRequest):
     if validation.get("status") != "valid":
         raise HTTPException(status_code=422, detail=validation.get("message", "Template settings are invalid"))
     resolved_template_id = validation["template_id"]
-    rendered_path = renderer.render(
-        timeline=timeline,
-        template_id=resolved_template_id,
-        settings={
-            "resolution": req.resolution, 
-            "fps": req.fps, 
-            "codec": req.codec, 
-            "aspect_ratio": req.aspect_ratio,
-            "motion_intensity": req.motion_intensity
-        },
-        output_path=output_video_path
+    job_id = uuid.uuid4().hex
+    settings = {
+        "resolution": req.resolution,
+        "fps": req.fps,
+        "codec": req.codec,
+        "aspect_ratio": req.aspect_ratio,
+        "motion_intensity": req.motion_intensity,
+    }
+    RenderJobService.create_job(job_id, project_id, req.renderer, resolved_template_id)
+    background_tasks.add_task(
+        _run_render_job,
+        job_id,
+        project_id,
+        req.renderer,
+        resolved_template_id,
+        timeline,
+        settings,
+        output_video_path,
     )
-    if not rendered_path.exists() or rendered_path.stat().st_size < 1000:
-        raise HTTPException(status_code=500, detail="Renderer completed without producing a usable MP4 file")
 
     return {
-        "status": "success",
+        "status": "queued",
+        "job_id": job_id,
         "project_id": project_id,
         "renderer": req.renderer,
         "template_id": resolved_template_id,
-        "output_file": str(rendered_path),
+        "progress_url": f"/api/v1/projects/{project_id}/render-status/{job_id}",
         "download_url": f"/api/v1/projects/{project_id}/renders/download"
+    }
+
+
+@app.get("/api/v1/projects/{project_id}/render-status/{job_id}")
+def render_status(project_id: str, job_id: str):
+    job = RenderJobService.get_job(job_id)
+    if not job or job.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Render job not found")
+    return {
+        "job_id": job.job_id,
+        "project_id": job.project_id,
+        "renderer": job.renderer,
+        "template_id": job.template_id,
+        "status": job.status,
+        "progress_percentage": job.progress_percentage,
+        "stage_message": job.stage_message,
+        "output_path": job.output_path,
+        "download_url": f"/api/v1/projects/{project_id}/renders/download",
     }
 
 

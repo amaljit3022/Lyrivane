@@ -19,6 +19,28 @@ interface LyricLine {
   words?: Array<{ text: string; start_ms: number; end_ms: number }>;
 }
 
+type PreviewTheme = {
+  name: string;
+  background: string;
+  panel: string;
+  accent: string;
+  text: string;
+  fontFamily: string;
+  kind: 'aurora' | 'glass' | 'solar' | 'neon' | 'paper' | 'signal' | 'editorial' | 'cinematic' | 'wind';
+};
+
+const PREVIEW_THEMES: Record<string, PreviewTheme> = {
+  'aurora-pulse': { name: 'Aurora Pulse', background: 'radial-gradient(circle at 50% 42%, rgba(87, 228, 255, .32), transparent 36%), linear-gradient(140deg, #090b1a, #05060d)', panel: 'rgba(13, 18, 45, .42)', accent: '#8cf6ff', text: '#f8fbff', fontFamily: 'Inter, system-ui, sans-serif', kind: 'aurora' },
+  'glass-halo': { name: 'Glass Halo', background: 'radial-gradient(circle at 50% 42%, rgba(164, 143, 255, .32), transparent 38%), linear-gradient(140deg, #080b18, #05060d)', panel: 'rgba(22, 26, 57, .62)', accent: '#b8a7ff', text: '#f8fbff', fontFamily: 'Inter, system-ui, sans-serif', kind: 'glass' },
+  'solar-flare': { name: 'Solar Flare', background: 'radial-gradient(circle at 50% 45%, rgba(255, 155, 67, .34), transparent 35%), linear-gradient(140deg, #140b0a, #080506)', panel: 'rgba(49, 20, 12, .46)', accent: '#ffe28a', text: '#fff7e6', fontFamily: 'Inter, system-ui, sans-serif', kind: 'solar' },
+  'neon-orbit': { name: 'Neon Orbit', background: 'radial-gradient(circle at 50% 50%, rgba(52, 219, 255, .3), transparent 30%), linear-gradient(135deg, #070716, #160726 70%, #03040b)', panel: 'rgba(7, 12, 34, .66)', accent: '#55f6ff', text: '#f4ffff', fontFamily: 'Inter, system-ui, sans-serif', kind: 'neon' },
+  'paper-bloom': { name: 'Paper Bloom', background: 'radial-gradient(circle at 20% 18%, rgba(255,255,255,.92), transparent 28%), linear-gradient(135deg, #f4ead8, #e6c9ae)', panel: 'rgba(255, 250, 239, .78)', accent: '#b54836', text: '#2b211d', fontFamily: 'Georgia, serif', kind: 'paper' },
+  'signal-noir': { name: 'Signal Noir', background: 'linear-gradient(135deg, #0b0d0d, #171b19 50%, #050606)', panel: 'rgba(9, 12, 12, .86)', accent: '#a4ff42', text: '#f8f8f2', fontFamily: 'ui-monospace, SFMono-Regular, monospace', kind: 'signal' },
+  'editorial-motion': { name: 'Editorial Motion', background: 'linear-gradient(135deg, #1c1711, #090909 65%)', panel: 'rgba(20, 18, 16, .68)', accent: '#f2b544', text: '#fffaf0', fontFamily: 'Inter, system-ui, sans-serif', kind: 'editorial' },
+  'cinematic-fade': { name: 'Cinematic Fade', background: 'radial-gradient(circle at center, #252540, #0a0a12 75%)', panel: 'rgba(20, 20, 38, .68)', accent: '#d9c2ff', text: '#f4efff', fontFamily: 'Georgia, serif', kind: 'cinematic' },
+  'whispering-wind': { name: 'Whispering Wind', background: 'linear-gradient(135deg, #0b132b, #1c2541 50%, #3a506b)', panel: 'rgba(18, 35, 62, .5)', accent: '#8de7e0', text: '#edf2f4', fontFamily: 'Quicksand, system-ui, sans-serif', kind: 'wind' },
+};
+
 export const PreviewStage: React.FC<PreviewStageProps> = ({
   projectId,
   selectedRenderer,
@@ -111,6 +133,7 @@ export const PreviewStage: React.FC<PreviewStageProps> = ({
     (l) => currentTimeMs >= l.start_ms && currentTimeMs <= l.end_ms
   );
   const nextLine = lyrics.find(l => l.start_ms > currentTimeMs);
+  const theme = PREVIEW_THEMES[selectedTemplate] || PREVIEW_THEMES['aurora-pulse'];
 
   const formatTime = (ms: number) => {
     const totalSecs = Math.floor(ms / 1000);
@@ -145,25 +168,37 @@ export const PreviewStage: React.FC<PreviewStageProps> = ({
                 <p className="text-gray-300">Loading Preview Canvas...</p>
               </div>
             ) : (
-              <div className="h-full bg-gradient-to-tr from-slate-950 via-indigo-950 to-slate-900 flex flex-col items-center justify-center p-8 relative min-h-[360px]">
+              <div className="h-full flex flex-col items-center justify-center p-8 relative min-h-[360px] overflow-hidden" style={{ background: theme.background, color: theme.text }}>
                 <audio 
                   ref={audioRef} 
                   src={`http://localhost:8005/api/v1/projects/${projectId || 'demo'}/audio`} 
                   onEnded={() => setIsPlaying(false)}
                 />
                 
-                <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-xs font-mono text-gray-300 capitalize">{selectedTemplate} • {aspectRatio}</span>
+                {theme.kind === 'neon' && <>
+                  <div className="absolute w-[70%] aspect-square rounded-full border opacity-60 animate-spin" style={{ borderColor: `${theme.accent}88`, boxShadow: `0 0 36px ${theme.accent}55`, animationDuration: '18s' }} />
+                  <div className="absolute w-[42%] h-[18%] rounded-[50%] border opacity-50 -rotate-12" style={{ borderColor: '#ff4fd888', boxShadow: '0 0 26px #ff4fd844' }} />
+                </>}
+                {theme.kind === 'signal' && <div className="absolute inset-0 opacity-15" style={{ backgroundImage: `repeating-linear-gradient(0deg, transparent 0 5px, ${theme.accent} 6px, transparent 7px)` }} />}
+                {theme.kind === 'paper' && <div className="absolute top-8 right-10 w-28 h-28 rounded-full blur-2xl opacity-30" style={{ background: theme.accent }} />}
+
+                <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 z-10">
+                  <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: theme.accent }} />
+                  <span className="text-xs font-mono opacity-80">{theme.name} • {aspectRatio}</span>
                 </div>
 
                 {/* Animated Word Display */}
-                <div className="text-center space-y-4 max-w-2xl px-4">
-                  <p className={`text-3xl sm:text-5xl font-extrabold text-white tracking-tight drop-shadow-2xl transition-all duration-300 ${
+                <div className="text-center space-y-4 max-w-3xl px-4 relative z-10">
+                  <div className="rounded-3xl px-8 py-8 border transition-all duration-300" style={{ background: theme.panel, borderColor: `${theme.accent}55`, boxShadow: `0 0 55px ${theme.accent}22`, backdropFilter: theme.kind === 'glass' ? 'blur(16px)' : 'blur(4px)' }}>
+                    <div className={`text-3xl sm:text-5xl font-extrabold tracking-tight drop-shadow-2xl transition-all duration-300 ${
                     activeLine ? 'scale-105 opacity-100' : 'opacity-50'
-                  }`}>
-                    {activeLine?.display_text || (nextLine ? 'Waiting for the next line…' : 'Music Playing…')}
-                  </p>
+                  }`} style={{ color: theme.text, fontFamily: theme.fontFamily }}>
+                      {activeLine?.words?.length ? activeLine.words.map((word, index) => {
+                        const activeWord = currentTimeMs >= word.start_ms && currentTimeMs <= word.end_ms;
+                        return <span key={`${word.text}-${index}`} className="inline-block mx-1 transition-all duration-200" style={{ color: activeWord ? theme.accent : theme.text, transform: activeWord ? 'translateY(-3px) scale(1.06)' : undefined, textShadow: activeWord ? `0 0 18px ${theme.accent}` : undefined }}>{word.text}</span>;
+                      }) : (activeLine?.display_text || (nextLine ? 'Waiting for the next line…' : 'Music Playing…'))}
+                    </div>
+                  </div>
                   {activeLine?.words && activeLine.words.length > 0 && (
                     <div className="flex flex-wrap justify-center gap-2 pt-2">
                       {activeLine.words.map((w, i) => {

@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
@@ -90,7 +91,8 @@ class RemotionRendererAdapter(RendererAdapter):
             }
             formatted_lines.append(line_data)
 
-        audio_file = timeline.audio.original_file or timeline.audio.working_file
+        # Prefer normalized WAV so Remotion does not need to decode an upload container.
+        audio_file = timeline.audio.working_file or timeline.audio.original_file
         return {
             "title": timeline.title,
             "artist": timeline.artist,
@@ -108,6 +110,19 @@ class RemotionRendererAdapter(RendererAdapter):
             "visual_plan": visual_plan.model_dump(),
             "audio_analysis": audio_analysis.model_dump()
         }
+
+    @staticmethod
+    def _stage_audio_asset(timeline: CanonicalTimeline, remotion_cwd: Path) -> tuple[Path, str]:
+        source = Path(timeline.audio.working_file or timeline.audio.original_file or "")
+        if not source.exists() or not source.is_file() or source.stat().st_size == 0:
+            raise FileNotFoundError(f"Render audio file not found: {source}")
+
+        asset_dir = remotion_cwd / "public" / "render-assets"
+        asset_dir.mkdir(parents=True, exist_ok=True)
+        suffix = source.suffix.lower() or ".wav"
+        target = asset_dir / f"lyrivane-{timeline.project_id}{suffix}"
+        shutil.copy2(source, target)
+        return target, f"render-assets/{target.name}"
 
     def create_preview(
         self,
@@ -131,28 +146,33 @@ class RemotionRendererAdapter(RendererAdapter):
     ) -> Path:
         output_dir = output_path.parent
         output_dir.mkdir(parents=True, exist_ok=True)
-        props = self.prepare_remotion_props(timeline, template_id, settings)
-        props_path = output_dir / "remotion_props.json"
-        with open(props_path, "w", encoding="utf-8") as f:
-            json.dump(props, f, indent=2)
-
-        cmd = [
-            "npx", "--no-install", "remotion", "render",
-            "src/index.ts",
-            "LyrivaneComposition",
-            str(output_path.resolve()),
-            "--props", str(props_path.resolve()),
-            "--concurrency=1",
-        ]
-        codec = str(settings.get("codec", "h264")).lower()
-        if codec in {"h264", "h265", "hevc"}:
-            cmd.extend(["--codec", "h265" if codec in {"h265", "hevc"} else "h264"])
-
         remotion_cwd = Path(os.getenv("REMOTION_DIR", "/app/remotion"))
         if not remotion_cwd.exists():
             remotion_cwd = Path(__file__).resolve().parents[2] / "remotion"
 
+        staged_audio: Path | None = None
+
         try:
+            staged_audio, render_audio_url = self._stage_audio_asset(timeline, remotion_cwd)
+            props = self.prepare_remotion_props(timeline, template_id, settings)
+            props["audioUrl"] = render_audio_url
+            props["audio_url"] = render_audio_url
+            props_path = output_dir / "remotion_props.json"
+            with open(props_path, "w", encoding="utf-8") as f:
+                json.dump(props, f, indent=2)
+
+            cmd = [
+                "npx", "--no-install", "remotion", "render",
+                "src/index.ts",
+                "LyrivaneComposition",
+                str(output_path.resolve()),
+                "--props", str(props_path.resolve()),
+                "--concurrency=1",
+            ]
+            codec = str(settings.get("codec", "h264")).lower()
+            if codec in {"h264", "h265", "hevc"}:
+                cmd.extend(["--codec", "h265" if codec in {"h265", "hevc"} else "h264"])
+
             result = subprocess.run(cmd, cwd=remotion_cwd, capture_output=True, text=True, check=False)
             if result.returncode != 0:
                 raise RuntimeError(result.stderr[-4000:] or result.stdout[-4000:])
@@ -168,6 +188,9 @@ class RemotionRendererAdapter(RendererAdapter):
             )
             if not fallback_path.exists() or fallback_path.stat().st_size < 1000:
                 raise RuntimeError("Lyric-capable fallback failed to produce an MP4")
+        finally:
+            if staged_audio and staged_audio.exists():
+                staged_audio.unlink(missing_ok=True)
 
         return output_path
 
