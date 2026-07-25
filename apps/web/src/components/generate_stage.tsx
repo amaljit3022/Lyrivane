@@ -21,17 +21,21 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
   const [codec, setCodec] = useState('h264');
   const [isRendering, setIsRendering] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [stageMessage, setStageMessage] = useState('Preparing render...');
   const [isComplete, setIsComplete] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string>(
     `http://localhost:8005/api/v1/projects/${projectId || 'demo'}/renders/download`
   );
   const [outputFolderMsg, setOutputFolderMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const startRender = async () => {
     setIsRendering(true);
-    setProgress(10);
+    setProgress(0);
+    setStageMessage('Submitting render job...');
     setIsComplete(false);
     setOutputFolderMsg(null);
+    setErrorMsg(null);
 
     const targetProjectId = projectId || 'demo';
 
@@ -53,25 +57,41 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
       if (response.ok) {
         const data = await response.json();
         setDownloadUrl(`http://localhost:8005${data.download_url}`);
+        if (!data.job_id || !data.progress_url) {
+          throw new Error('Render service returned no job status endpoint');
+        }
+
+        let completed = false;
+        while (!completed) {
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          const statusResponse = await fetch(`http://localhost:8005${data.progress_url}`);
+          if (!statusResponse.ok) {
+            throw new Error(`Unable to read render progress (${statusResponse.status})`);
+          }
+          const status = await statusResponse.json();
+          setProgress(Math.max(0, status.progress_percentage ?? 0));
+          setStageMessage(status.stage_message || 'Rendering video...');
+
+          if (status.status === 'completed') {
+            completed = true;
+          } else if (status.status === 'failed') {
+            throw new Error(status.stage_message || 'Video generation failed');
+          }
+        }
+        setProgress(100);
+        setIsRendering(false);
+        setIsComplete(true);
       } else {
-        setDownloadUrl(`http://localhost:8005/api/v1/projects/${targetProjectId}/renders/download`);
+        const message = await response.text();
+        throw new Error(message || `Render failed (${response.status})`);
       }
     } catch (err) {
-      console.warn('Render API call fallback:', err);
-      setDownloadUrl(`http://localhost:8005/api/v1/projects/${targetProjectId}/renders/download`);
+      console.error('Render API call failed:', err);
+      setIsRendering(false);
+      setErrorMsg(err instanceof Error ? err.message : 'Video generation failed');
+      return;
     }
 
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsRendering(false);
-          setIsComplete(true);
-          return 100;
-        }
-        return prev + 25;
-      });
-    }, 600);
   };
 
   const handleDownload = () => {
@@ -159,6 +179,11 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
 
       {/* Render Action Box */}
       <div className="glass-card p-8 rounded-2xl text-center space-y-6">
+        {errorMsg && (
+          <div className="p-4 rounded-xl border border-red-500/40 bg-red-500/10 text-sm text-red-300">
+            {errorMsg}
+          </div>
+        )}
         {!isRendering && !isComplete && (
           <div className="space-y-4">
             <p className="text-sm text-gray-300">
@@ -186,7 +211,7 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <p className="text-xs text-gray-400 animate-pulse">Encoding frames and multiplexing original master audio...</p>
+            <p className="text-xs text-gray-400 animate-pulse">{stageMessage}</p>
           </div>
         )}
 

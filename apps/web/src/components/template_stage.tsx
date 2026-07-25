@@ -10,12 +10,24 @@ interface TemplateItem {
   description: string;
   gradient?: string;
   supported_aspect_ratios?: string[];
+  preview_gradient?: string;
 }
 
 const DEFAULT_TEMPLATES: TemplateItem[] = [
+  { id: 'neon-orbit', name: 'Neon Orbit', renderer: 'remotion', description: 'Futuristic orbiting light trails with crisp, precise word pulses.', gradient: 'from-cyan-950 via-indigo-950 to-fuchsia-950' },
+  { id: 'paper-bloom', name: 'Paper Bloom', renderer: 'remotion', description: 'Warm tactile lyric cards with soft ink-like reveals.', gradient: 'from-amber-100 via-orange-200 to-rose-300' },
+  { id: 'signal-noir', name: 'Signal Noir', renderer: 'remotion', description: 'Monochrome broadcast texture with sharp lime signal highlights.', gradient: 'from-slate-950 via-zinc-900 to-black' },
   { id: 'editorial-motion', name: 'Editorial Motion', renderer: 'remotion', description: 'Magazine kinetic typography with spring physics, uppercase emphasis, and dark editorial backgrounds.', gradient: 'from-amber-900 to-stone-950' },
   { id: 'cinematic-fade', name: 'Cinematic Fade', renderer: 'remotion', description: 'Emotional serif typography with radial dark ambient gradients, camera zoom, and blur transitions.', gradient: 'from-violet-950 to-slate-950' },
   { id: 'whispering-wind', name: 'Whispering Wind', renderer: 'remotion', description: 'Floating wave motion, horizontal drift, particle dispersion, and serene visual cyan tones.', gradient: 'from-cyan-950 to-blue-950' },
+  { id: 'aurora-pulse', name: 'Aurora Pulse', renderer: 'remotion', description: 'Central lyric stage with glowing word emphasis and soft aurora motion.', gradient: 'from-cyan-900 to-violet-950' },
+  { id: 'glass-halo', name: 'Glass Halo', renderer: 'remotion', description: 'Centered lyrics inside a calm translucent glass frame.', gradient: 'from-violet-900 to-slate-950' },
+  { id: 'solar-flare', name: 'Solar Flare', renderer: 'remotion', description: 'Warm central lyrics with a restrained cinematic flare.', gradient: 'from-orange-900 to-rose-950' },
+];
+
+const KARAOKE_TEMPLATES: TemplateItem[] = [
+  { id: 'classic-two-line', name: 'Central Aurora', renderer: 'karaoke', description: 'Centered lyrics with active-word highlighting and a dark contrast panel.', gradient: 'from-cyan-900 to-violet-950' },
+  { id: 'minimal-dark', name: 'Minimal Dark', renderer: 'karaoke', description: 'Clean centered lyrics with restrained contrast and word highlighting.', gradient: 'from-slate-900 to-black' },
 ];
 
 interface TemplateStageProps {
@@ -35,10 +47,13 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
   onSelectAspectRatio,
   onNext,
 }) => {
-  const [templates, setTemplates] = useState<TemplateItem[]>(DEFAULT_TEMPLATES);
+  const [templates, setTemplates] = useState<TemplateItem[]>(selectedRenderer === 'karaoke' ? KARAOKE_TEMPLATES : DEFAULT_TEMPLATES);
+  const [showMore, setShowMore] = useState(false);
 
   useEffect(() => {
     const fetchTemplates = async () => {
+      setTemplates(selectedRenderer === 'karaoke' ? KARAOKE_TEMPLATES : DEFAULT_TEMPLATES);
+      setShowMore(false);
       try {
         const res = await fetch(`http://localhost:8005/api/v1/templates?renderer=${selectedRenderer}`);
         if (res.ok) {
@@ -49,7 +64,8 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
               name: t.name,
               renderer: t.renderer || selectedRenderer,
               description: t.description || 'Custom kinetic typography template.',
-              gradient: DEFAULT_TEMPLATES[i % DEFAULT_TEMPLATES.length].gradient
+              gradient: t.preview_gradient || DEFAULT_TEMPLATES[i % DEFAULT_TEMPLATES.length].gradient,
+              supported_aspect_ratios: t.supported_aspect_ratios || ['16:9', '9:16', '1:1']
             })));
           }
         }
@@ -60,11 +76,18 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
     fetchTemplates();
   }, [selectedRenderer]);
 
+  const featuredIds = selectedRenderer === 'karaoke'
+    ? ['classic-two-line', 'minimal-dark']
+    : ['neon-orbit', 'paper-bloom', 'signal-noir'];
+  const featuredTemplates = templates.filter((template) => featuredIds.includes(template.id));
+  const additionalTemplates = templates.filter((template) => !featuredIds.includes(template.id));
+  const visibleTemplates = showMore ? templates : featuredTemplates;
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn">
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-extrabold text-white tracking-tight">Choose Template & Aspect Ratio</h2>
-        <p className="text-gray-400 text-sm">Select a visual template configured for the <span className="text-indigo-400 font-semibold uppercase">{selectedRenderer}</span> engine.</p>
+        <p className="text-gray-400 text-sm">Choose a style. Your synchronized timing stays unchanged.</p>
       </div>
 
       {/* Aspect Ratio Selector */}
@@ -95,7 +118,7 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
 
       {/* Template Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {templates.map((tpl) => {
+        {visibleTemplates.map((tpl) => {
           const isSelected = selectedTemplate === tpl.id;
           return (
             <div
@@ -126,6 +149,18 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
           );
         })}
       </div>
+
+      {additionalTemplates.length > 0 && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => setShowMore((current) => !current)}
+            className="text-xs font-semibold text-indigo-300 hover:text-white border border-surfaceBorder hover:border-indigo-400 rounded-full px-4 py-2 transition-colors"
+          >
+            {showMore ? 'Show featured styles' : `More styles (${additionalTemplates.length})`}
+          </button>
+        </div>
+      )}
 
       <div className="flex justify-end pt-4">
         <button

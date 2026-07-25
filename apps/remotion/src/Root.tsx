@@ -15,13 +15,16 @@ const defaultProps: LyrivaneProps = {
       ],
     },
   ],
+  template_id: "aurora-pulse",
   aspect_ratio: "16:9",
+  resolution: "1080p",
 };
 
 const calculateMetadata: CalculateMetadataFunction<LyrivaneProps> = ({ props }) => {
   const ratio = props.aspect_ratio || "16:9";
-  let width = 1920;
-  let height = 1080;
+  const baseHeight = props.resolution === "4K" ? 2160 : props.resolution === "1440p" ? 1440 : 1080;
+  let width = Math.round(baseHeight * 16 / 9);
+  let height = baseHeight;
 
   if (ratio === "9:16") {
     width = 1080;
@@ -40,11 +43,13 @@ const calculateMetadata: CalculateMetadataFunction<LyrivaneProps> = ({ props }) 
     }
   }
 
-  const durationInFrames = Math.max(60, Math.round((maxMs / 1000) * 30));
+  const fps = props.fps || 30;
+  const durationInFrames = Math.max(60, Math.round((maxMs / 1000) * fps));
 
   return {
     width,
     height,
+    fps,
     durationInFrames,
   };
 };

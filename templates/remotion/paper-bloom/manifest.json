@@ -1,0 +1,11 @@
+{
+  "id": "paper-bloom",
+  "name": "Paper Bloom",
+  "renderer": "remotion",
+  "version": "1.0.0",
+  "description": "Warm tactile lyric cards with soft ink blooms, editorial spacing, and gentle word reveals.",
+  "preview_gradient": "from-amber-100 via-orange-200 to-rose-300",
+  "supported_aspect_ratios": ["16:9", "9:16", "1:1"],
+  "timing_support": ["line", "word"],
+  "config_schema": {"motion_intensity": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.35}}
+}

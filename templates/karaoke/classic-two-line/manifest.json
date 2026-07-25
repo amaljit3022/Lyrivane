@@ -1,0 +1,11 @@
+{
+  "id": "classic-two-line",
+  "name": "Central Aurora",
+  "renderer": "karaoke",
+  "version": "1.0.0",
+  "description": "Centered lyrics with active-word highlighting and a dark contrast panel.",
+  "supported_aspect_ratios": ["16:9", "9:16", "1:1"],
+  "timing_support": ["line", "word"],
+  "config_schema": {"font_size": {"type": "number", "default": 68}},
+  "render_config": {"font_size": 68, "primary_color": "&H00F6FF8C", "secondary_color": "&H00F3F6FF", "outline_color": "&H00120A26", "back_color": "&HAA26120B", "alignment": 5}
+}

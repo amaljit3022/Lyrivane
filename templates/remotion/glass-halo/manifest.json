@@ -1,0 +1,11 @@
+{
+  "id": "glass-halo",
+  "name": "Glass Halo",
+  "renderer": "remotion",
+  "version": "1.0.0",
+  "description": "Central glass lyric panel with luminous edge light and soft upcoming-line haze.",
+  "supported_aspect_ratios": ["16:9", "9:16", "1:1"],
+  "timing_support": ["line", "word"],
+  "preview_asset": "preview.mp4",
+  "config_schema": {"motion_intensity": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.5}}
+}

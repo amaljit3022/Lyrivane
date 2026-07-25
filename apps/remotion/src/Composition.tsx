@@ -6,6 +6,12 @@ import { WhisperingWind } from "./templates/WhisperingWind";
 import { WordCompositionProps } from "./typography/WordRenderer";
 import { AudioAnalysisProps } from "./audio/useAudioReactive";
 import { TitleCard } from "./typography/TitleCard";
+import { AuroraPulse } from "./templates/AuroraPulse";
+import { GlassHalo } from "./templates/GlassHalo";
+import { SolarFlare } from "./templates/SolarFlare";
+import { NeonOrbit } from "./templates/NeonOrbit";
+import { PaperBloom } from "./templates/PaperBloom";
+import { SignalNoir } from "./templates/SignalNoir";
 
 export type LineTiming = {
   id: string;
@@ -22,15 +28,29 @@ export type LyrivaneProps = {
   lines: LineTiming[];
   template_id?: string;
   aspect_ratio?: "16:9" | "9:16" | "1:1";
+  resolution?: "1080p" | "1440p" | "4K";
+  fps?: number;
   audio_analysis?: AudioAnalysisProps;
 };
 
 export const LyrivaneComposition: React.FC<LyrivaneProps> = (props) => {
-  const templateId = props.template_id || "editorial-motion";
+  const templateId = props.template_id || "aurora-pulse";
   const aspectRatio = props.aspect_ratio || "16:9";
 
   const renderTemplate = () => {
     switch (templateId) {
+      case "aurora-pulse":
+        return <AuroraPulse audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
+      case "glass-halo":
+        return <GlassHalo audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
+      case "solar-flare":
+        return <SolarFlare audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
+      case "neon-orbit":
+        return <NeonOrbit audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
+      case "paper-bloom":
+        return <PaperBloom audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
+      case "signal-noir":
+        return <SignalNoir audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
       case "cinematic-fade":
       case "cinematic-minimal":
         return (
@@ -68,7 +88,7 @@ export const LyrivaneComposition: React.FC<LyrivaneProps> = (props) => {
   return (
     <>
       {showTitleCard && (
-        <Sequence from={0} durationInFrames={120}>
+        <Sequence durationInFrames={120}>
           <TitleCard title={props.title || "Untitled"} artist={props.artist || "Unknown Artist"} />
         </Sequence>
       )}
