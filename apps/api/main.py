@@ -151,6 +151,7 @@ class RenderRequest(BaseModel):
     codec: str = "h264"
     aspect_ratio: str = "16:9"
     motion_intensity: float = 0.5
+    key_color: str = "#00ff00"
 
 
 SUPPORTED_RENDERERS = {"karaoke": KaraokeRendererAdapter, "remotion": RemotionRendererAdapter}
@@ -283,11 +284,15 @@ def get_project(project_id: str):
                 timeline_data = json.load(f)
                 
             audio_meta = project.get("audio_meta")
-            # Apply AlignmentService to align Whisper's hallucinated timings back to user's precise lyrics
-            aligned_lines = AlignmentService.align_user_lyrics_to_whisper(
-                project.get("lines", []),
-                timeline_data.get("lines", [])
-            )
+            if timeline_data.get("alignment_mode") == "automatic_transcription":
+                # For blank input, Whisper is the source of both text and timing.
+                aligned_lines = timeline_data.get("lines", [])
+            else:
+                # Apply AlignmentService to align Whisper's hallucinated timings back to user's precise lyrics.
+                aligned_lines = AlignmentService.align_user_lyrics_to_whisper(
+                    project.get("lines", []),
+                    timeline_data.get("lines", [])
+                )
             
             timeline = CanonicalTimeline(
                 project_id=project_id,
@@ -300,6 +305,7 @@ def get_project(project_id: str):
             )
             project["canonical_timeline"] = timeline.model_dump()
             project["lines"] = [l.model_dump() for l in timeline.lines]
+            project["has_lyrics"] = bool(project["lines"])
             project["status"] = "synchronized"
             project["sync_progress"] = {"message": "Synchronization complete!", "percent": 100}
             _persist_project(project_id, project)
@@ -394,10 +400,13 @@ async def upload_lyrics(
     if file:
         file_bytes = await file.read()
         content = file_bytes.decode("utf-8", errors="ignore")
-    elif raw_text:
+    elif raw_text is not None:
+        # An empty field is intentional: it selects automatic transcription.
         content = raw_text
     else:
-        raise HTTPException(status_code=400, detail="Provide raw_text or a file")
+        # Some multipart clients omit an empty field entirely; with audio present,
+        # that still means automatic transcription.
+        content = ""
 
     project = _load_project(project_id)
     if project is None:
@@ -417,6 +426,20 @@ async def upload_lyrics(
         }
 
         project = projects_db[project_id]
+
+    if not content.strip():
+        if not project.get("audio_meta"):
+            raise HTTPException(status_code=422, detail="Upload audio before requesting automatic transcription")
+        project["sections"] = []
+        project["lines"] = []
+        project["has_lyrics"] = False
+        project["status"] = "transcription_pending"
+        project_dir = PROJECTS_DIR / project_id
+        (project_dir / "lyrics" / "source").mkdir(parents=True, exist_ok=True)
+        (project_dir / "lyrics" / "source" / "raw_lyrics.txt").write_text("", encoding="utf-8")
+        _persist_project(project_id, project)
+        return ProjectResponse(**project)
+
     duration_ms = project["audio_meta"].duration_ms if project.get("audio_meta") else 180000
 
     sections, lines = LyricsService.process_raw_lyrics(content, total_duration_ms=duration_ms)
@@ -461,6 +484,8 @@ def render_video(project_id: str, req: RenderRequest, background_tasks: Backgrou
         raise HTTPException(status_code=422, detail="fps must be between 1 and 120")
     if req.codec.lower() not in {"h264", "h265", "hevc"}:
         raise HTTPException(status_code=422, detail="codec must be h264 or h265")
+    if req.key_color.lower() not in {"#00ff00", "#0000ff"}:
+        raise HTTPException(status_code=422, detail="key_color must be #00ff00 or #0000ff")
     project_dir = PROJECTS_DIR / project_id
     renders_dir = project_dir / "renders"
     renders_dir.mkdir(parents=True, exist_ok=True)
@@ -496,7 +521,7 @@ def render_video(project_id: str, req: RenderRequest, background_tasks: Backgrou
     validation = renderer.validate_project(
         timeline,
         req.template_id,
-        {"aspect_ratio": req.aspect_ratio, "fps": req.fps, "resolution": req.resolution, "codec": req.codec},
+        {"aspect_ratio": req.aspect_ratio, "fps": req.fps, "resolution": req.resolution, "codec": req.codec, "key_color": req.key_color},
     )
     if validation.get("status") != "valid":
         raise HTTPException(status_code=422, detail=validation.get("message", "Template settings are invalid"))
@@ -508,6 +533,7 @@ def render_video(project_id: str, req: RenderRequest, background_tasks: Backgrou
         "codec": req.codec,
         "aspect_ratio": req.aspect_ratio,
         "motion_intensity": req.motion_intensity,
+        "key_color": req.key_color,
     }
     RenderJobService.create_job(job_id, project_id, req.renderer, resolved_template_id)
     background_tasks.add_task(

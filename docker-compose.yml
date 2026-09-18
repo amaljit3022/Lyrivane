@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: lyricflow
       POSTGRES_PASSWORD: lyricflow_secret
     ports:
-      - "5435:5432"
+      - "5445:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -55,7 +55,7 @@ services:
       dockerfile: Dockerfile
     container_name: lyrivane_frontend
     ports:
-      - "3005:3000"
+      - "3015:3000"
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8005
     depends_on:

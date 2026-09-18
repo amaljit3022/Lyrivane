@@ -106,6 +106,7 @@ class RemotionRendererAdapter(RendererAdapter):
             "codec": settings.get("codec", "h264"),
             "template_id": template_id,
             "aspect_ratio": aspect_ratio,
+            "key_color": settings.get("key_color", "#00ff00"),
             "lines": formatted_lines,
             "visual_plan": visual_plan.model_dump(),
             "audio_analysis": audio_analysis.model_dump()
@@ -216,8 +217,9 @@ class RemotionRendererAdapter(RendererAdapter):
             # Keep lyrics and the original soundtrack in the fallback. A blank
             # color card is not a valid export for this application.
             from renderers.karaoke_renderer import KaraokeRendererAdapter
+            fallback_template = "green-screen-lyrics" if template_id == "green-screen-lyrics" else "classic-two-line"
             fallback_path = KaraokeRendererAdapter().render(
-                timeline, "classic-two-line", {}, output_path,
+                timeline, fallback_template, settings, output_path,
                 progress_callback=progress_callback,
             )
             if not fallback_path.exists() or fallback_path.stat().st_size < 1000:

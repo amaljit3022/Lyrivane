@@ -19,6 +19,7 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
   const [resolution, setResolution] = useState('1080p');
   const [fps, setFps] = useState('30');
   const [codec, setCodec] = useState('h264');
+  const [keyColor, setKeyColor] = useState('#00ff00');
   const [isRendering, setIsRendering] = useState(false);
   const [progress, setProgress] = useState(0);
   const [stageMessage, setStageMessage] = useState('Preparing render...');
@@ -28,6 +29,7 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
   );
   const [outputFolderMsg, setOutputFolderMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const isGreenScreenTemplate = selectedTemplate === 'green-screen-lyrics';
 
   const startRender = async () => {
     setIsRendering(true);
@@ -50,7 +52,8 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
           fps: parseInt(fps),
           codec,
           aspect_ratio: aspectRatio,
-          motion_intensity: 0.6
+          motion_intensity: 0.6,
+          key_color: isGreenScreenTemplate ? keyColor : '#00ff00'
         })
       });
 
@@ -176,6 +179,28 @@ export const GenerateStage: React.FC<GenerateStageProps> = ({
           </div>
         </div>
       </div>
+
+      {isGreenScreenTemplate && (
+        <div className="glass-card p-6 rounded-2xl space-y-4">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Key Color</label>
+          <div className="grid grid-cols-2 gap-2 max-w-sm">
+            {[{ value: '#00ff00', label: 'Green' }, { value: '#0000ff', label: 'Blue' }].map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setKeyColor(option.value)}
+                className={`py-2 rounded-xl text-xs font-semibold border transition-all ${
+                  keyColor === option.value
+                    ? 'bg-indigo-600 border-indigo-500 text-white'
+                    : 'bg-surface border-surfaceBorder text-gray-400 hover:text-white'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] leading-relaxed text-gray-500">Use blue when the foreground contains green clothing or props.</p>
+        </div>
+      )}
 
       {/* Render Action Box */}
       <div className="glass-card p-8 rounded-2xl text-center space-y-6">

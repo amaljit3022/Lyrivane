@@ -58,7 +58,39 @@ def _transcribe(model, audio_path: Path):
         language="en",
         vad=False,
         condition_on_previous_text=False,
+        temperature=0.0,
+        beam_size=5,
+        best_of=5,
+        patience=1.0,
     )
+
+
+def _chunk_whisper_words(words: list[dict], max_words: int = 8, max_chars: int = 46) -> list[list[dict]]:
+    """Keep automatic lyric cards readable without changing word timestamps."""
+    chunks: list[list[dict]] = []
+    current: list[dict] = []
+    current_chars = 0
+    sentence_marks = (".", "!", "?", ";", ":")
+
+    for word in words:
+        token = str(word.get("display_text", "")).strip()
+        projected = current_chars + (1 if current else 0) + len(token)
+        should_split = bool(current) and (len(current) >= max_words or projected > max_chars)
+        if should_split:
+            chunks.append(current)
+            current = []
+            current_chars = 0
+
+        current.append(word)
+        current_chars += (1 if current_chars else 0) + len(token)
+        if len(current) >= 4 and token.endswith(sentence_marks):
+            chunks.append(current)
+            current = []
+            current_chars = 0
+
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 def _whisper_lines(result: dict) -> list[dict]:
@@ -80,17 +112,20 @@ def _whisper_lines(result: dict) -> list[dict]:
             })
         if not word_timings:
             continue
-        lines.append({
-            "id": f"l-{seg_idx}",
-            "section_id": "verse",
-            "display_text": str(segment.get("text", "")).strip(),
-            "alignment_text": str(segment.get("text", "")).strip().lower(),
-            "start_ms": word_timings[0]["start_ms"],
-            "end_ms": word_timings[-1]["end_ms"],
-            "confidence": 0.0,
-            "source": "automatic",
-            "words": word_timings,
-        })
+        for chunk_idx, chunk in enumerate(_chunk_whisper_words(word_timings)):
+            display_text = " ".join(word["display_text"] for word in chunk).strip()
+            confidence = sum(word.get("confidence", 0.0) for word in chunk) / max(1, len(chunk))
+            lines.append({
+                "id": f"l-{seg_idx}-{chunk_idx}",
+                "section_id": "verse",
+                "display_text": display_text,
+                "alignment_text": display_text.lower(),
+                "start_ms": chunk[0]["start_ms"],
+                "end_ms": chunk[-1]["end_ms"],
+                "confidence": confidence,
+                "source": "automatic",
+                "words": chunk,
+            })
     return lines
 
 
@@ -103,35 +138,45 @@ def align_lyrics(project_id: str):
 
         lyrics_file = project_dir / "lyrics" / "source" / "raw_lyrics.txt"
         audio_path = _find_audio(project_dir)
-        if not lyrics_file.exists():
-            update_progress(project_id, "Error: Lyrics file not found.", -1)
-            return
         if audio_path is None:
             update_progress(project_id, "Error: Audio file not found.", -1)
             return
 
-        raw_lyrics = lyrics_file.read_text(encoding="utf-8").strip()
+        raw_lyrics = lyrics_file.read_text(encoding="utf-8").strip() if lyrics_file.exists() else ""
         audio_meta: AudioMetadata = AudioService.probe_audio(audio_path)
-        _, user_lines = LyricsService.process_raw_lyrics(raw_lyrics, audio_meta.duration_ms)
-        if not user_lines:
+        _, user_lines = LyricsService.process_raw_lyrics(raw_lyrics, audio_meta.duration_ms) if raw_lyrics else ([], [])
+        if raw_lyrics and not user_lines:
             update_progress(project_id, "Error: No lyric lines found.", -1)
             return
 
-        update_progress(project_id, "Transcribing audio for word timestamps...", 30)
+        if raw_lyrics:
+            update_progress(project_id, "Transcribing audio for word timestamps...", 30)
+        else:
+            update_progress(project_id, "No lyrics supplied; transcribing audio automatically...", 30)
         result = _transcribe(model, audio_path)
         whisper_lines = _whisper_lines(result)
         if not whisper_lines:
             update_progress(project_id, "Error: Transcription produced no word timestamps.", -1)
             return
 
-        update_progress(project_id, "Aligning supplied lyrics to audio timestamps...", 80)
-        user_line_dicts = [line.model_dump(mode="json") for line in user_lines]
         repaired_whisper = AlignmentService.repair_whisper_timestamps(whisper_lines)
-        aligned_lines = AlignmentService.align_user_lyrics_to_whisper(user_line_dicts, repaired_whisper)
+        if user_lines:
+            update_progress(project_id, "Aligning supplied lyrics to audio timestamps...", 80)
+            user_line_dicts = [line.model_dump(mode="json") for line in user_lines]
+            aligned_lines = AlignmentService.align_user_lyrics_to_whisper(user_line_dicts, repaired_whisper)
+            alignment_mode = "user_lyrics_mapped_to_whisper_word_timestamps"
+        else:
+            update_progress(project_id, "Using automatic transcription as synchronized lyrics...", 80)
+            aligned_lines = repaired_whisper
+            alignment_mode = "automatic_transcription"
+
+        if not aligned_lines:
+            update_progress(project_id, "Error: Transcription produced no lyric lines.", -1)
+            return
 
         timeline_data = {
             "schema_version": "1.0",
-            "alignment_mode": "user_lyrics_mapped_to_whisper_word_timestamps",
+            "alignment_mode": alignment_mode,
             "lines": aligned_lines,
         }
         (project_dir / "timeline.json").write_text(

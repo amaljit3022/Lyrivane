@@ -2,7 +2,7 @@
 
 ## Current pipeline
 
-1. The user-provided lyrics are parsed into canonical lines and words while preserving display text.
+1. Supplied lyrics are parsed into canonical lines and words while preserving display text; when the lyrics field is blank, Whisper transcription becomes the generated lyric source.
 2. Whisper is used only to obtain timestamp anchors from the working WAV file.
 3. `AlignmentService` maps the supplied lyrics to those anchors using normalized words and a monotonic dynamic-programming alignment.
 4. The canonical timeline is used by both preview and final rendering.

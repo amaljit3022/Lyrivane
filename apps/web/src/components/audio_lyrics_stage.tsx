@@ -43,7 +43,7 @@ export const AudioLyricsStage: React.FC<Stage1Props> = ({ onNext, isSyncing = fa
     <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn">
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-extrabold text-white tracking-tight">Audio & Lyrics Input</h2>
-        <p className="text-gray-400 text-sm">Upload your audio/video file and paste your song lyrics below.</p>
+        <p className="text-gray-400 text-sm">Upload your audio/video file and paste your lyrics below, or leave the lyrics blank to generate them automatically.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -97,7 +97,7 @@ export const AudioLyricsStage: React.FC<Stage1Props> = ({ onNext, isSyncing = fa
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-violet-400" />
-                <h3 className="font-semibold text-white">2. Paste Song Lyrics</h3>
+                <h3 className="font-semibold text-white">2. Paste Song Lyrics (Optional)</h3>
               </div>
               <label className="text-xs text-indigo-400 hover:underline cursor-pointer">
                 Import File
@@ -108,7 +108,7 @@ export const AudioLyricsStage: React.FC<Stage1Props> = ({ onNext, isSyncing = fa
               rows={10}
               value={lyricsText}
               onChange={(e) => setLyricsText(e.target.value)}
-              placeholder="Paste matching lyrics here..."
+              placeholder="Optional: paste lyrics here, or leave blank to transcribe the audio automatically..."
               className="w-full bg-surface border border-surfaceBorder rounded-xl p-3 text-sm text-gray-200 focus:outline-none focus:border-violet-500 font-mono resize-none"
             />
           </div>

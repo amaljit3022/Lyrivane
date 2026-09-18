@@ -26,7 +26,7 @@ type PreviewTheme = {
   accent: string;
   text: string;
   fontFamily: string;
-  kind: 'aurora' | 'glass' | 'solar' | 'neon' | 'paper' | 'signal' | 'editorial' | 'cinematic' | 'wind';
+  kind: 'aurora' | 'glass' | 'solar' | 'neon' | 'paper' | 'signal' | 'greenscreen' | 'editorial' | 'cinematic' | 'wind';
 };
 
 const PREVIEW_THEMES: Record<string, PreviewTheme> = {
@@ -36,6 +36,7 @@ const PREVIEW_THEMES: Record<string, PreviewTheme> = {
   'neon-orbit': { name: 'Neon Orbit', background: 'radial-gradient(circle at 50% 50%, rgba(52, 219, 255, .3), transparent 30%), linear-gradient(135deg, #070716, #160726 70%, #03040b)', panel: 'rgba(7, 12, 34, .66)', accent: '#55f6ff', text: '#f4ffff', fontFamily: 'Inter, system-ui, sans-serif', kind: 'neon' },
   'paper-bloom': { name: 'Paper Bloom', background: 'radial-gradient(circle at 20% 18%, rgba(255,255,255,.92), transparent 28%), linear-gradient(135deg, #f4ead8, #e6c9ae)', panel: 'rgba(255, 250, 239, .78)', accent: '#b54836', text: '#2b211d', fontFamily: 'Georgia, serif', kind: 'paper' },
   'signal-noir': { name: 'Signal Noir', background: 'linear-gradient(135deg, #0b0d0d, #171b19 50%, #050606)', panel: 'rgba(9, 12, 12, .86)', accent: '#a4ff42', text: '#f8f8f2', fontFamily: 'ui-monospace, SFMono-Regular, monospace', kind: 'signal' },
+  'green-screen-lyrics': { name: 'Green Screen Lyrics', background: '#00ff00', panel: 'transparent', accent: '#fff200', text: '#ffffff', fontFamily: 'Inter, system-ui, sans-serif', kind: 'greenscreen' },
   'editorial-motion': { name: 'Editorial Motion', background: 'linear-gradient(135deg, #1c1711, #090909 65%)', panel: 'rgba(20, 18, 16, .68)', accent: '#f2b544', text: '#fffaf0', fontFamily: 'Inter, system-ui, sans-serif', kind: 'editorial' },
   'cinematic-fade': { name: 'Cinematic Fade', background: 'radial-gradient(circle at center, #252540, #0a0a12 75%)', panel: 'rgba(20, 20, 38, .68)', accent: '#d9c2ff', text: '#f4efff', fontFamily: 'Georgia, serif', kind: 'cinematic' },
   'whispering-wind': { name: 'Whispering Wind', background: 'linear-gradient(135deg, #0b132b, #1c2541 50%, #3a506b)', panel: 'rgba(18, 35, 62, .5)', accent: '#8de7e0', text: '#edf2f4', fontFamily: 'Quicksand, system-ui, sans-serif', kind: 'wind' },
@@ -134,6 +135,14 @@ export const PreviewStage: React.FC<PreviewStageProps> = ({
   );
   const nextLine = lyrics.find(l => l.start_ms > currentTimeMs);
   const theme = PREVIEW_THEMES[selectedTemplate] || PREVIEW_THEMES['aurora-pulse'];
+  const activeText = activeLine?.display_text || activeLine?.words?.map((word) => word.text).join(' ') || '';
+  const activeTextLength = Math.max(activeText.length, 1);
+  const previewMaxFont = aspectRatio === '9:16' ? 42 : 56;
+  const previewMinFont = aspectRatio === '9:16' ? 20 : 24;
+  const previewFontSize = Math.max(
+    previewMinFont,
+    Math.min(previewMaxFont, Math.round((aspectRatio === '9:16' ? 2800 : 3600) / activeTextLength))
+  );
 
   const formatTime = (ms: number) => {
     const totalSecs = Math.floor(ms / 1000);
@@ -189,13 +198,13 @@ export const PreviewStage: React.FC<PreviewStageProps> = ({
 
                 {/* Animated Word Display */}
                 <div className="text-center space-y-4 max-w-3xl px-4 relative z-10">
-                  <div className="rounded-3xl px-8 py-8 border transition-all duration-300" style={{ background: theme.panel, borderColor: `${theme.accent}55`, boxShadow: `0 0 55px ${theme.accent}22`, backdropFilter: theme.kind === 'glass' ? 'blur(16px)' : 'blur(4px)' }}>
-                    <div className={`text-3xl sm:text-5xl font-extrabold tracking-tight drop-shadow-2xl transition-all duration-300 ${
-                    activeLine ? 'scale-105 opacity-100' : 'opacity-50'
-                  }`} style={{ color: theme.text, fontFamily: theme.fontFamily }}>
+                  <div className="rounded-3xl px-8 py-8 border transition-all duration-300" style={{ background: theme.panel, borderColor: theme.kind === 'greenscreen' ? 'transparent' : `${theme.accent}55`, boxShadow: theme.kind === 'greenscreen' ? 'none' : `0 0 55px ${theme.accent}22`, backdropFilter: theme.kind === 'glass' ? 'blur(16px)' : 'blur(4px)', padding: activeTextLength > 80 ? '20px 24px' : undefined, overflow: 'hidden' }}>
+                    <div className={`font-extrabold tracking-tight drop-shadow-2xl transition-all duration-300 ${
+                    activeLine ? 'opacity-100' : 'opacity-50'
+                  }`} style={{ color: theme.text, fontFamily: theme.fontFamily, fontSize: `${previewFontSize}px`, lineHeight: 1.06, maxWidth: '100%', overflowWrap: 'break-word' }}>
                       {activeLine?.words?.length ? activeLine.words.map((word, index) => {
                         const activeWord = currentTimeMs >= word.start_ms && currentTimeMs <= word.end_ms;
-                        return <span key={`${word.text}-${index}`} className="inline-block mx-1 transition-all duration-200" style={{ color: activeWord ? theme.accent : theme.text, transform: activeWord ? 'translateY(-3px) scale(1.06)' : undefined, textShadow: activeWord ? `0 0 18px ${theme.accent}` : undefined }}>{word.text}</span>;
+                        return <span key={`${word.text}-${index}`} className="inline-block mx-1 transition-all duration-200" style={{ color: activeWord ? theme.accent : theme.text, transform: activeWord ? 'translateY(-3px) scale(1.06)' : undefined, textShadow: theme.kind === 'greenscreen' ? '0 3px 0 #000, 0 0 8px #000' : activeWord ? `0 0 18px ${theme.accent}` : undefined, WebkitTextStroke: theme.kind === 'greenscreen' ? '1px #000' : undefined }}>{word.text}</span>;
                       }) : (activeLine?.display_text || (nextLine ? 'Waiting for the next line…' : 'Music Playing…'))}
                     </div>
                   </div>

@@ -15,6 +15,7 @@ interface TemplateItem {
 
 const DEFAULT_TEMPLATES: TemplateItem[] = [
   { id: 'neon-orbit', name: 'Neon Orbit', renderer: 'remotion', description: 'Futuristic orbiting light trails with crisp, precise word pulses.', gradient: 'from-cyan-950 via-indigo-950 to-fuchsia-950' },
+  { id: 'green-screen-lyrics', name: 'Green Screen Lyrics', renderer: 'remotion', description: 'Keying-safe lyrics on a uniform green background for replacement in another editor.', gradient: 'from-lime-500 to-green-400' },
   { id: 'paper-bloom', name: 'Paper Bloom', renderer: 'remotion', description: 'Warm tactile lyric cards with soft ink-like reveals.', gradient: 'from-amber-100 via-orange-200 to-rose-300' },
   { id: 'signal-noir', name: 'Signal Noir', renderer: 'remotion', description: 'Monochrome broadcast texture with sharp lime signal highlights.', gradient: 'from-slate-950 via-zinc-900 to-black' },
   { id: 'editorial-motion', name: 'Editorial Motion', renderer: 'remotion', description: 'Magazine kinetic typography with spring physics, uppercase emphasis, and dark editorial backgrounds.', gradient: 'from-amber-900 to-stone-950' },
@@ -78,7 +79,7 @@ export const TemplateStage: React.FC<TemplateStageProps> = ({
 
   const featuredIds = selectedRenderer === 'karaoke'
     ? ['classic-two-line', 'minimal-dark']
-    : ['neon-orbit', 'paper-bloom', 'signal-noir'];
+    : ['neon-orbit', 'green-screen-lyrics', 'paper-bloom'];
   const featuredTemplates = templates.filter((template) => featuredIds.includes(template.id));
   const additionalTemplates = templates.filter((template) => !featuredIds.includes(template.id));
   const visibleTemplates = showMore ? templates : featuredTemplates;

@@ -58,6 +58,11 @@ class KaraokeRendererAdapter(RendererAdapter):
         template_id: str,
         settings: Dict[str, Any]
     ) -> Dict[str, Any]:
+        if template_id == "green-screen-lyrics":
+            aspect_ratio = settings.get("aspect_ratio", "16:9")
+            if aspect_ratio not in {"16:9", "9:16", "1:1"}:
+                return {"status": "invalid", "message": f"Template {template_id} does not support {aspect_ratio}"}
+            return {"status": "valid", "template_id": template_id}
         valid_ids = [t["id"] for t in self.list_templates()]
         if template_id not in valid_ids:
             template_id = "classic-two-line"
@@ -144,10 +149,88 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         progress_callback: Optional[Callable[[int, str], None]] = None,
     ) -> Path:
         output_ass = output_path.with_suffix(".ass")
+        if template_id == "green-screen-lyrics":
+            width, height = self.output_dimensions(str(settings.get("resolution", "1080p")), str(settings.get("aspect_ratio", "16:9")))
+            self.generate_green_screen_ass_subtitles(timeline, width, height, output_ass)
+            return output_ass
         templates = self.list_templates()
         tpl = next((t for t in templates if t["id"] == template_id), templates[0])
         self.generate_ass_subtitles(timeline, tpl, output_ass)
         return output_ass
+
+    @staticmethod
+    def generate_green_screen_ass_subtitles(timeline: CanonicalTimeline, width: int, height: int, output_ass_path: Path) -> Path:
+        ass_header = f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {width}
+PlayResY: {height}
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Karaoke,Arial,{max(42, min(104, round(width / 24)))},&H00FFFFFF,&H00FFF200,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,5,2,5,80,80,80,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+        events = []
+
+        def fmt_time(seconds: float) -> str:
+            hrs = int(seconds // 3600)
+            mins = int((seconds % 3600) // 60)
+            secs = seconds % 60
+            return f"{hrs}:{mins:02d}:{secs:05.2f}"
+
+        for line in timeline.lines:
+            k_text_parts = []
+            for word in line.words:
+                duration_cs = max(int((word.end_ms - word.start_ms) / 10), 1)
+                k_text_parts.append(f"{{\\k{duration_cs}}}{word.display_text} ")
+            k_text = "".join(k_text_parts).strip() or line.display_text
+            events.append(
+                f"Dialogue: 0,{fmt_time(line.start_ms / 1000.0)},{fmt_time(line.end_ms / 1000.0)},Karaoke,,0,0,0,,{{\\an5}}{k_text}"
+            )
+
+        with open(output_ass_path, "w", encoding="utf-8") as f:
+            f.write(ass_header + "\n".join(events))
+        return output_ass_path
+
+    @staticmethod
+    def _green_screen_key_color(settings: Dict[str, Any]) -> str:
+        color = str(settings.get("key_color", "#00ff00")).lower().strip()
+        return "0x0000ff" if color == "#0000ff" else "0x00ff00"
+
+    def render_green_screen(
+        self,
+        timeline: CanonicalTimeline,
+        settings: Dict[str, Any],
+        output_path: Path,
+        progress_callback: Optional[Callable[[int, str], None]] = None,
+    ) -> Path:
+        output_dir = output_path.parent
+        output_dir.mkdir(parents=True, exist_ok=True)
+        width, height = self.output_dimensions(str(settings.get("resolution", "1080p")), str(settings.get("aspect_ratio", "16:9")))
+        output_ass = output_dir / "green_screen_subtitles.ass"
+        self.generate_green_screen_ass_subtitles(timeline, width, height, output_ass)
+        duration_sec = max(timeline.audio.duration_ms / 1000.0, 5.0)
+        fps = max(1, int(settings.get("fps", 30)))
+        codec = "libx265" if str(settings.get("codec", "h264")).lower() in {"h265", "hevc"} else "libx264"
+        audio_file_path = Path(timeline.audio.working_file or timeline.audio.original_file)
+        audio_args = ["-i", str(audio_file_path.resolve())] if audio_file_path.exists() and audio_file_path.is_file() and audio_file_path.stat().st_size > 0 else ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
+        cmd = [
+            "ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c={self._green_screen_key_color(settings)}:s={width}x{height}:d={duration_sec}:r={fps}",
+            *audio_args, "-vf", f"subtitles={output_ass.name}", "-map", "0:v:0", "-map", "1:a:0",
+            "-c:v", codec, "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-r", str(fps),
+            "-c:a", "aac", "-b:a", "192k", "-shortest", output_path.name,
+        ]
+        if progress_callback:
+            progress_callback(20, "Generating keying-safe lyric overlay...")
+        subprocess.run(cmd, cwd=output_dir, capture_output=True, text=True, check=True)
+        if progress_callback:
+            progress_callback(96, "Encoding final green-screen video and audio...")
+        if not output_path.exists() or output_path.stat().st_size < 1000:
+            raise RuntimeError("Green-screen render completed without creating a usable MP4")
+        return output_path
 
     def render(
         self,
@@ -159,6 +242,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     ) -> Path:
         output_dir = output_path.parent
         output_dir.mkdir(parents=True, exist_ok=True)
+        if template_id == "green-screen-lyrics":
+            return self.render_green_screen(timeline, settings, output_path, progress_callback)
         output_ass = output_dir / "subtitles.ass"
 
         templates = self.list_templates()

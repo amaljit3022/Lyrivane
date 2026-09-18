@@ -12,6 +12,7 @@ import { SolarFlare } from "./templates/SolarFlare";
 import { NeonOrbit } from "./templates/NeonOrbit";
 import { PaperBloom } from "./templates/PaperBloom";
 import { SignalNoir } from "./templates/SignalNoir";
+import { GreenScreenLyrics } from "./templates/GreenScreenLyrics";
 
 export type LineTiming = {
   id: string;
@@ -30,6 +31,7 @@ export type LyrivaneProps = {
   aspect_ratio?: "16:9" | "9:16" | "1:1";
   resolution?: "1080p" | "1440p" | "4K";
   fps?: number;
+  key_color?: string;
   audio_analysis?: AudioAnalysisProps;
 };
 
@@ -51,6 +53,8 @@ export const LyrivaneComposition: React.FC<LyrivaneProps> = (props) => {
         return <PaperBloom audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
       case "signal-noir":
         return <SignalNoir audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} />;
+      case "green-screen-lyrics":
+        return <GreenScreenLyrics audioUrl={props.audioUrl} lines={props.lines} aspectRatio={aspectRatio} keyColor={props.key_color} />;
       case "cinematic-fade":
       case "cinematic-minimal":
         return (
@@ -83,7 +87,7 @@ export const LyrivaneComposition: React.FC<LyrivaneProps> = (props) => {
     }
   };
 
-  const showTitleCard = Boolean(props.title && props.title !== "Untitled");
+  const showTitleCard = templateId !== "green-screen-lyrics" && Boolean(props.title && props.title !== "Untitled");
 
   return (
     <>

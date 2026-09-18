@@ -26,3 +26,19 @@ def test_karaoke_ass_subtitle_generation(tmp_path):
     assert "Style: Karaoke" in content
     assert "\\k" in content
     assert "Golden" in content
+
+
+def test_green_screen_ass_subtitle_generation(tmp_path):
+    audio = AudioMetadata(original_file="song.mp3", duration_ms=60000)
+    words = [WordTiming(display_text="Keyed", alignment_text="keyed", start_ms=1000, end_ms=1800)]
+    timeline = CanonicalTimeline(
+        project_id="test-green-screen",
+        audio=audio,
+        lines=[LineTiming(display_text="Keyed lyrics", alignment_text="keyed lyrics", start_ms=1000, end_ms=2200, words=words)],
+    )
+    output = tmp_path / "green.ass"
+    KaraokeRendererAdapter.generate_green_screen_ass_subtitles(timeline, 1920, 1080, output)
+    content = output.read_text(encoding="utf-8")
+    assert "PlayResX: 1920" in content
+    assert "Style: Karaoke" in content
+    assert "Keyed" in content

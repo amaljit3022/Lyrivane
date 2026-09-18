@@ -65,6 +65,15 @@ export const CentralLyricStage: React.FC<CentralStageProps> = ({ audioUrl, lines
   const yPadding = aspectRatio === "9:16" ? "18vh 7vw" : "10vh 6vw";
   const isPaper = variant === "paper";
   const isSignal = variant === "signal";
+  const currentText = current?.display_text || current?.words.map((word) => word.text).join(" ") || "";
+  const lineLength = Math.max(currentText.length, 1);
+  const maxLyricFontSize = aspectRatio === "9:16" ? 74 : 92;
+  const minLyricFontSize = aspectRatio === "9:16" ? 28 : 34;
+  const lyricFontSize = Math.max(
+    minLyricFontSize,
+    Math.min(maxLyricFontSize, Math.round((aspectRatio === "9:16" ? 3000 : 5200) / lineLength))
+  );
+  const panelPadding = lineLength > 90 ? "clamp(16px, 2vw, 28px) clamp(18px, 3vw, 60px)" : "clamp(20px, 3vw, 48px) clamp(24px, 5vw, 100px)";
 
   return (
     <AbsoluteFill style={{ background: isPaper ? `radial-gradient(circle at 20% 18%, rgba(255,255,255,.9), transparent 30%), linear-gradient(135deg, ${palette.bg}, #e6c9ae)` : `radial-gradient(circle at 50% 46%, ${palette.glow} 0%, transparent 36%), linear-gradient(140deg, ${palette.bg}, #05060d 72%)`, color: isPaper ? "#2b211d" : "#f8fbff", fontFamily: isPaper ? "Georgia, serif" : isSignal ? "ui-monospace, SFMono-Regular, monospace" : "Inter, system-ui, sans-serif", overflow: "hidden" }}>
@@ -76,14 +85,14 @@ export const CentralLyricStage: React.FC<CentralStageProps> = ({ audioUrl, lines
       {isSignal && <div style={{ position: "absolute", inset: 0, opacity: .16, backgroundImage: "repeating-linear-gradient(0deg, transparent 0 5px, #a4ff42 6px, transparent 7px)" }} />}
       <AbsoluteFill style={{ padding: yPadding, justifyContent: "center", alignItems: "center" }}>
         <div style={{ width: "min(88vw, 1500px)", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "clamp(18px, 3vh, 42px)" }}>
-          <div style={{ minHeight: "1.4em", color: "rgba(230,238,255,.28)", fontSize: "clamp(20px, 2.2vw, 42px)", fontWeight: 500, filter: "blur(1px)", transform: "translateY(-8px)" }}>{previous?.display_text || ""}</div>
-          <div style={{ position: "relative", width: "100%", padding: "clamp(20px, 3vw, 48px) clamp(24px, 5vw, 100px)", borderRadius: variant === "glass" ? 34 : 18, background: panel, border: `1px solid ${palette.accent}33`, boxShadow: `0 0 70px ${palette.glow}, inset 0 0 40px rgba(255,255,255,.035)`, backdropFilter: variant === "glass" ? "blur(18px)" : "blur(5px)" }}>
+          <div style={{ minHeight: "1.4em", maxWidth: "78%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "rgba(230,238,255,.28)", fontSize: "clamp(20px, 2.2vw, 42px)", fontWeight: 500, filter: "blur(1px)", transform: "translateY(-8px)" }}>{previous?.display_text || ""}</div>
+          <div style={{ position: "relative", width: "100%", padding: panelPadding, borderRadius: variant === "glass" ? 34 : 18, background: panel, border: `1px solid ${palette.accent}33`, boxShadow: `0 0 70px ${palette.glow}, inset 0 0 40px rgba(255,255,255,.035)`, backdropFilter: variant === "glass" ? "blur(18px)" : "blur(5px)", overflow: "hidden" }}>
             <div style={{ position: "absolute", left: "12%", right: "12%", top: 0, height: 2, background: `linear-gradient(90deg, transparent, ${palette.accent}, ${palette.accent2}, transparent)`, boxShadow: `0 0 20px ${palette.accent}` }} />
-            <div style={{ fontSize: "clamp(34px, 5vw, 92px)", lineHeight: 1.1, letterSpacing: "-.025em", wordBreak: "normal" }}>
+            <div style={{ fontSize: `${lyricFontSize}px`, lineHeight: 1.06, letterSpacing: "-.025em", wordBreak: "break-word", overflowWrap: "break-word", maxWidth: "100%" }}>
               {(current?.words || []).map((word, index) => <Word key={`${current?.id}-${index}`} word={word} frame={frame} fps={fps} palette={palette} variant={variant} />)}
             </div>
           </div>
-          <div style={{ minHeight: "1.4em", color: "rgba(230,238,255,.18)", fontSize: "clamp(18px, 1.8vw, 34px)", fontWeight: 500, filter: "blur(5px)", transform: "translateY(8px)" }}>{next?.display_text || ""}</div>
+          <div style={{ minHeight: "1.4em", maxWidth: "78%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "rgba(230,238,255,.18)", fontSize: "clamp(18px, 1.8vw, 34px)", fontWeight: 500, filter: "blur(5px)", transform: "translateY(8px)" }}>{next?.display_text || ""}</div>
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

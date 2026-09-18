@@ -7,7 +7,7 @@ LyricFlow Studio is a local-first, open-source application designed to transform
 
 ## 🌟 Key Features
 
-- **Automated Lyrics-to-Audio Alignment**: Advanced forced alignment hierarchy using wav2vec2 CTC alignment, selective refinement, Demucs vocal stem isolation, and ASR fallbacks.
+- **Automated Lyrics-to-Audio Alignment**: Advanced forced alignment hierarchy using wav2vec2 CTC alignment, selective refinement, Demucs vocal stem isolation, and ASR fallbacks. If lyrics are omitted, Whisper automatically transcribes and timestamps the track.
 - **Dual Text Representation**: Preserves exact user display formatting (spelling, capitalization, punctuation, line breaks) while utilizing a normalized representation for alignment mapping.
 - **Multi-Engine Renderer Architecture**:
   1. **Fast Karaoke**: Low-overhead FFmpeg & ASS subtitle rendering for rapid 1080p generation.

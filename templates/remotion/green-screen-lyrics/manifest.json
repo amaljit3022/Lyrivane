@@ -1,0 +1,26 @@
+{
+  "id": "green-screen-lyrics",
+  "name": "Green Screen Lyrics",
+  "renderer": "remotion",
+  "version": "1.0.0",
+  "description": "Keying-safe lyric overlay on a uniform green or blue background for replacement in another editor.",
+  "preview_gradient": "from-lime-500 to-green-400",
+  "supported_aspect_ratios": ["16:9", "9:16", "1:1"],
+  "timing_support": ["line", "word"],
+  "config_schema": {
+    "key_color": {
+      "type": "string",
+      "default": "#00ff00"
+    },
+    "outline_width": {
+      "type": "number",
+      "minimum": 2,
+      "maximum": 16,
+      "default": 6
+    },
+    "layout": {
+      "type": "string",
+      "default": "center"
+    }
+  }
+}

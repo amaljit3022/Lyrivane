@@ -20,6 +20,11 @@ export default function HomePage() {
   const [syncMessage, setSyncMessage] = useState('');
 
   const handleStage1Submit = async (data: { audioFile: File | null; lyricsText: string; title: string; artist: string }) => {
+    if (!data.audioFile && !data.lyricsText.trim()) {
+      setSyncMessage('Upload an audio track before generating lyrics automatically.');
+      return;
+    }
+
     setIsSyncing(true);
 
     try {
@@ -45,24 +50,32 @@ export default function HomePage() {
       if (data.audioFile) {
         const formData = new FormData();
         formData.append('file', data.audioFile);
-        await fetch(`http://localhost:8005/api/v1/projects/${activeId}/audio`, {
+        const audioRes = await fetch(`http://localhost:8005/api/v1/projects/${activeId}/audio`, {
           method: 'POST',
           body: formData
         });
+        if (!audioRes.ok) throw new Error(`Audio upload failed (${audioRes.status})`);
       }
 
-      // Step C: Upload Pasted Lyrics
+      // Step C: Upload pasted lyrics, or explicitly select automatic transcription.
+      const hasManualLyrics = Boolean(data.lyricsText.trim());
+      setSyncMessage(hasManualLyrics ? 'Preparing supplied lyrics...' : 'No lyrics supplied; transcribing audio automatically...');
       const lyricsFormData = new FormData();
       lyricsFormData.append('raw_text', data.lyricsText);
-      await fetch(`http://localhost:8005/api/v1/projects/${activeId}/lyrics`, {
+      const lyricsRes = await fetch(`http://localhost:8005/api/v1/projects/${activeId}/lyrics`, {
         method: 'POST',
         body: lyricsFormData
       });
+      if (!lyricsRes.ok) {
+        const detail = await lyricsRes.text();
+        throw new Error(detail || `Lyrics preparation failed (${lyricsRes.status})`);
+      }
 
       // Step D: Trigger Automated Synchronization
-      await fetch(`http://localhost:8005/api/v1/projects/${activeId}/synchronize`, {
+      const syncRes = await fetch(`http://localhost:8005/api/v1/projects/${activeId}/synchronize`, {
         method: 'POST'
       });
+      if (!syncRes.ok) throw new Error(`Synchronization could not start (${syncRes.status})`);
 
       // Step E: Poll for synchronization completion
       let isDone = false;
